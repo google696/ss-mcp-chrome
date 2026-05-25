@@ -1,5 +1,6 @@
 const DEFAULT_WS_URL = "ws://127.0.0.1:12307";
 const AUTO_RECONNECT_DELAY_MS = 1200;
+const USER_SCRIPTS_KEY = "ssUserScripts";
 
 let socket = null;
 let state = "disconnected";
@@ -27,6 +28,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   return false;
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status !== "complete" || !tab.url || !isInjectableUrl(tab.url)) return;
+  injectMatchingUserScripts(tabId, tab.url).catch(() => {});
 });
 
 function connect() {
@@ -57,7 +63,7 @@ function connect() {
     socket = null;
     scheduleReconnect();
   });
-  socket.addEventListener("error", (event) => {
+  socket.addEventListener("error", () => {
     state = "disconnected";
     lastError = "无法连接 ws://127.0.0.1:12307。请先启动 ss-mcp-chrome。";
   });
@@ -141,9 +147,7 @@ async function handleBridgeMessage(raw) {
     return;
   }
 
-  if (message.kind === "heartbeat") {
-    return;
-  }
+  if (message.kind === "heartbeat") return;
 
   try {
     const result = await dispatchAction(message.action, message.payload || {});
@@ -176,10 +180,22 @@ async function dispatchAction(action, payload) {
       return await runInActiveTab(fillElement, [payload.selector, payload.value]);
     case "page.eval":
       return await runInActiveTab(evalCode, [payload.code]);
+    case "scripts.list":
+      return await listUserScripts();
+    case "scripts.install":
+      return await installUserScript(payload);
+    case "scripts.remove":
+      return await removeUserScript(payload);
+    case "scripts.setEnabled":
+      return await setUserScriptEnabled(payload);
+    case "scripts.run":
+      return await runUserScript(payload);
+    case "scripts.runCode":
+      return await runUserScriptCode(payload);
     case "github.createRepository":
       return await runInActiveTab(createGithubRepository, [payload]);
     case "github.inspectNewRepositoryPage":
-      return await runInActiveTab(inspectGithubNewRepositoryPage);
+      return await runInActiveTab(inspectGithubPage);
     case "github.updateRepositoryAbout":
       return await runInActiveTab(updateGithubRepositoryAbout, [payload]);
     case "github.deleteRepository":
@@ -233,18 +249,26 @@ async function screenshot() {
 
 async function runInActiveTab(func, args = []) {
   const tab = await getActiveTab();
+  return await runInTab(tab.id, func, args);
+}
+
+async function runInTab(tabId, func, args = []) {
   const [result] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
+    target: { tabId },
     func,
     args
   });
-  return { tabId: tab.id, result: result?.result };
+  return { tabId, result: result?.result };
 }
 
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error("没有找到当前活动标签页");
   return tab;
+}
+
+function isInjectableUrl(url) {
+  return /^https?:\/\//i.test(url);
 }
 
 function readPage() {
@@ -298,6 +322,296 @@ function evalCode(code) {
     return Function(`"use strict"; return (${code});`)();
   } catch {
     return Function(`"use strict"; ${code}`)();
+  }
+}
+
+async function getStoredScripts() {
+  const data = await chrome.storage.local.get(USER_SCRIPTS_KEY);
+  return Array.isArray(data[USER_SCRIPTS_KEY]) ? data[USER_SCRIPTS_KEY] : [];
+}
+
+async function saveStoredScripts(scripts) {
+  await chrome.storage.local.set({ [USER_SCRIPTS_KEY]: scripts });
+}
+
+async function listUserScripts() {
+  const scripts = await getStoredScripts();
+  return {
+    count: scripts.length,
+    scripts: scripts.map(toScriptSummary)
+  };
+}
+
+async function installUserScript({ source, name = "", enabled = true }) {
+  if (!source || typeof source !== "string") throw new Error("source 不能为空");
+
+  const scripts = await getStoredScripts();
+  const metadata = parseUserScriptMetadata(source);
+  const id = createScriptId(name || metadata.name || "script");
+  const now = new Date().toISOString();
+  const script = {
+    id,
+    name: name || metadata.name || id,
+    description: metadata.description || "",
+    version: metadata.version || "",
+    author: metadata.author || "",
+    matches: metadata.match.length ? metadata.match : ["*://*/*"],
+    includes: metadata.include,
+    excludes: metadata.exclude,
+    grants: metadata.grant,
+    runAt: metadata["run-at"] || "document-idle",
+    enabled,
+    source,
+    createdAt: now,
+    updatedAt: now
+  };
+
+  scripts.push(script);
+  await saveStoredScripts(scripts);
+  return { installed: true, script: toScriptSummary(script) };
+}
+
+async function removeUserScript({ id }) {
+  const scripts = await getStoredScripts();
+  const next = scripts.filter((script) => script.id !== id);
+  if (next.length === scripts.length) throw new Error(`没有找到脚本：${id}`);
+  await saveStoredScripts(next);
+  return { removed: true, id };
+}
+
+async function setUserScriptEnabled({ id, enabled }) {
+  const scripts = await getStoredScripts();
+  const script = scripts.find((item) => item.id === id);
+  if (!script) throw new Error(`没有找到脚本：${id}`);
+  script.enabled = Boolean(enabled);
+  script.updatedAt = new Date().toISOString();
+  await saveStoredScripts(scripts);
+  return { updated: true, script: toScriptSummary(script) };
+}
+
+async function runUserScript({ id, tabId }) {
+  const scripts = await getStoredScripts();
+  const script = scripts.find((item) => item.id === id);
+  if (!script) throw new Error(`没有找到脚本：${id}`);
+  const targetTab = Number.isInteger(tabId) ? { id: tabId } : await getActiveTab();
+  const result = await executeUserScript(targetTab.id, script);
+  return { script: toScriptSummary(script), ...result };
+}
+
+async function runUserScriptCode({ source, name = "临时脚本", tabId }) {
+  if (!source || typeof source !== "string") throw new Error("source 不能为空");
+  const metadata = parseUserScriptMetadata(source);
+  const script = {
+    id: `temp-${Date.now()}`,
+    name: name || metadata.name || "临时脚本",
+    matches: metadata.match.length ? metadata.match : ["*://*/*"],
+    includes: metadata.include,
+    excludes: metadata.exclude,
+    grants: metadata.grant,
+    runAt: metadata["run-at"] || "document-idle",
+    enabled: true,
+    source
+  };
+  const targetTab = Number.isInteger(tabId) ? { id: tabId } : await getActiveTab();
+  return await executeUserScript(targetTab.id, script);
+}
+
+async function injectMatchingUserScripts(tabId, url) {
+  const scripts = await getStoredScripts();
+  const matched = scripts.filter((script) => script.enabled && matchesUserScript(script, url));
+  for (const script of matched) {
+    await executeUserScript(tabId, script, { automatic: true });
+  }
+}
+
+async function executeUserScript(tabId, script, options = {}) {
+  ensureUserScriptsAvailable();
+  const tab = await chrome.tabs.get(tabId);
+  if (!tab?.url || !isInjectableUrl(tab.url)) {
+    throw new Error("当前标签页不支持注入脚本");
+  }
+  if (!options.ignoreMatch && !matchesUserScript(script, tab.url)) {
+    return {
+      tabId,
+      skipped: true,
+      reason: "当前网址不匹配脚本规则",
+      url: tab.url
+    };
+  }
+
+  const [result] = await chrome.userScripts.execute({
+    target: { tabId },
+    js: [{ code: buildUserScriptCode(script) }],
+    injectImmediately: true,
+    world: "USER_SCRIPT"
+  });
+
+  return {
+    tabId,
+    url: tab.url,
+    automatic: Boolean(options.automatic),
+    result: result?.result
+  };
+}
+
+function parseUserScriptMetadata(source) {
+  const metadata = {
+    name: "",
+    description: "",
+    version: "",
+    author: "",
+    match: [],
+    include: [],
+    exclude: [],
+    grant: []
+  };
+  const block = source.match(/\/\/\s*==UserScript==([\s\S]*?)\/\/\s*==\/UserScript==/);
+  if (!block) return metadata;
+
+  for (const line of block[1].split(/\r?\n/)) {
+    const item = line.match(/^\s*\/\/\s*@([A-Za-z0-9:_-]+)\s+(.+?)\s*$/);
+    if (!item) continue;
+    const key = item[1];
+    const value = item[2];
+    if (["match", "include", "exclude", "grant"].includes(key)) {
+      metadata[key].push(value);
+    } else {
+      metadata[key] = value;
+    }
+  }
+  return metadata;
+}
+
+function toScriptSummary(script) {
+  return {
+    id: script.id,
+    name: script.name,
+    description: script.description || "",
+    version: script.version || "",
+    author: script.author || "",
+    enabled: Boolean(script.enabled),
+    matches: script.matches || [],
+    includes: script.includes || [],
+    excludes: script.excludes || [],
+    grants: script.grants || [],
+    runAt: script.runAt || "document-idle",
+    createdAt: script.createdAt || "",
+    updatedAt: script.updatedAt || ""
+  };
+}
+
+function createScriptId(name) {
+  const slug = String(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "script";
+  return `${slug}-${Date.now().toString(36)}`;
+}
+
+function matchesUserScript(script, url) {
+  const excludes = script.excludes || [];
+  if (excludes.some((pattern) => matchesPattern(pattern, url))) return false;
+
+  const includes = script.includes || [];
+  if (includes.length && includes.some((pattern) => matchesPattern(pattern, url))) return true;
+
+  const matches = script.matches?.length ? script.matches : ["*://*/*"];
+  return matches.some((pattern) => matchesPattern(pattern, url));
+}
+
+function matchesPattern(pattern, url) {
+  if (!pattern || pattern === "<all_urls>") return true;
+  if (pattern.startsWith("/") && pattern.endsWith("/")) {
+    return new RegExp(pattern.slice(1, -1)).test(url);
+  }
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`).test(url);
+}
+
+function ensureUserScriptsAvailable() {
+  if (!chrome.userScripts?.execute) {
+    throw new Error("当前 Chrome 没有开放 chrome.userScripts.execute。请确认扩展已授予 userScripts 权限，并在 chrome://extensions 打开开发者模式。");
+  }
+}
+
+function buildUserScriptCode(script) {
+  return `
+(async () => {
+  const __script = ${JSON.stringify({ id: script.id, name: script.name })};
+  const __logs = [];
+  const __storagePrefix = "ss-mcp-chrome:" + __script.id + ":";
+  const __serialize = (value) => {
+    if (value === undefined) return null;
+    try { return JSON.parse(JSON.stringify(value)); } catch { return String(value); }
+  };
+  const __pushLog = (level, args) => {
+    __logs.push({
+      level,
+      args: Array.from(args).map((item) => {
+        try { return typeof item === "string" ? item : JSON.stringify(item); } catch { return String(item); }
+      })
+    });
+  };
+  const console = {
+    log: (...args) => { __pushLog("log", args); globalThis.console.log(...args); },
+    info: (...args) => { __pushLog("info", args); globalThis.console.info(...args); },
+    warn: (...args) => { __pushLog("warn", args); globalThis.console.warn(...args); },
+    error: (...args) => { __pushLog("error", args); globalThis.console.error(...args); }
+  };
+  const GM_info = { script: { name: __script.name, id: __script.id } };
+  const GM_getValue = (key, defaultValue = undefined) => {
+    const raw = localStorage.getItem(__storagePrefix + key);
+    if (raw === null) return defaultValue;
+    try { return JSON.parse(raw); } catch { return raw; }
+  };
+  const GM_setValue = (key, value) => localStorage.setItem(__storagePrefix + key, JSON.stringify(value));
+  const GM_deleteValue = (key) => localStorage.removeItem(__storagePrefix + key);
+  const GM_addStyle = (css) => {
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.documentElement.appendChild(style);
+    return style;
+  };
+  const GM_log = (...args) => console.log(...args);
+  const GM_xmlhttpRequest = (details) => {
+    const controller = new AbortController();
+    fetch(details.url, {
+      method: details.method || "GET",
+      headers: details.headers,
+      body: details.data,
+      signal: controller.signal,
+      credentials: details.anonymous ? "omit" : "include"
+    })
+      .then(async (response) => {
+        const responseText = await response.text();
+        details.onload?.({ status: response.status, statusText: response.statusText, responseText, finalUrl: response.url });
+      })
+      .catch((error) => details.onerror?.({ error: String(error) }));
+    return { abort: () => controller.abort() };
+  };
+  try {
+    const unsafeWindow = globalThis;
+    const value = await (async () => {
+${script.source}
+//# sourceURL=ss-mcp-chrome-user-script-${script.id}.js
+    })();
+    return { ok: true, value: __serialize(value), logs: __logs };
+  } catch (error) {
+    return { ok: false, error: error.message || String(error), stack: error.stack || "", logs: __logs };
+  }
+})()
+`;
+}
+
+function serializeScriptValue(value) {
+  if (value === undefined) return null;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return String(value);
   }
 }
 
@@ -500,7 +814,7 @@ function createGithubRepository({ name, description = "", visibility = "public" 
   };
 }
 
-function inspectGithubNewRepositoryPage() {
+function inspectGithubPage() {
   const visibleText = (element) => (element.innerText || element.value || "").trim();
   return {
     url: location.href,

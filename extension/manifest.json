@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "SS MCP Chrome",
   "version": "0.1.0",
+  "minimum_chrome_version": "135",
   "description": "把 Chrome 连接到 ss-mcp-chrome 本地 MCP 桥接服务。",
   "icons": {
     "16": "icons/icon-16.png",
@@ -12,7 +13,9 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "storage",
+    "userScripts"
   ],
   "host_permissions": [
     "<all_urls>"

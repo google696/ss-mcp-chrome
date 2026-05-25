@@ -17,7 +17,8 @@
     "mcp",
     "chrome",
     "browser-automation",
-    "model-context-protocol"
+    "model-context-protocol",
+    "userscript"
   ],
   "author": "",
   "license": "MIT",

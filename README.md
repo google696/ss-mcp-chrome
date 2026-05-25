@@ -22,6 +22,7 @@
 - 通过 CSS 选择器点击页面元素
 - 通过 CSS 选择器填写输入框、文本域、下拉框和可编辑元素
 - 在可信页面执行 JavaScript，用于调试和高级自动化
+- 像 ScriptCat/Tampermonkey 一样安装和运行用户脚本
 - 提供 GitHub 仓库创建、About 更新、删除等辅助动作
 - 扩展端支持连接状态提示和自动重连
 - 同时支持 stdio MCP 和 Streamable HTTP MCP
@@ -119,6 +120,54 @@ curl -X POST http://127.0.0.1:12308/action ^
   -H "Content-Type: application/json" ^
   -d "{\"action\":\"tabs.navigate\",\"payload\":{\"url\":\"https://example.com\",\"newTab\":true}}"
 ```
+
+## 用户脚本
+
+我参考的是 ScriptCat 这类用户脚本管理器的使用方式：脚本里可以写 `==UserScript==` 元信息，用 `@match`、`@include`、`@exclude` 控制匹配页面。脚本安装后会保存在 Chrome 扩展的本地存储里，启用状态下会在匹配页面加载完成后自动运行。
+
+这部分基于 Chrome 官方的 `chrome.userScripts` API，需要 Chrome 135 或更高版本。加载扩展后，如果 Chrome 提示新增了 `userScripts` 权限，请重新启用扩展；如果扩展详情页里有“允许用户脚本”开关，也要打开。
+
+当前是轻量实现，不是完整 ScriptCat 兼容层。已支持：
+
+- `@name`
+- `@description`
+- `@version`
+- `@author`
+- `@match`
+- `@include`
+- `@exclude`
+- `@grant`
+- `@run-at`
+- `GM_info`
+- `GM_getValue`
+- `GM_setValue`
+- `GM_deleteValue`
+- `GM_addStyle`
+- `GM_log`
+- `GM_xmlhttpRequest`
+- `unsafeWindow`
+
+临时运行一段脚本：
+
+```bash
+curl -X POST http://127.0.0.1:12308/action ^
+  -H "Content-Type: application/json" ^
+  -d "{\"action\":\"scripts.runCode\",\"payload\":{\"source\":\"GM_log(document.title); return document.title;\"}}"
+```
+
+安装一个用户脚本：
+
+```javascript
+// ==UserScript==
+// @name         示例标题脚本
+// @match        https://example.com/*
+// @grant        GM_log
+// ==/UserScript==
+
+GM_log("当前标题", document.title);
+```
+
+安装后可以通过 MCP 工具 `script_list` 查看脚本 ID，再用 `script_run` 手动运行，或保持启用状态让它自动匹配运行。
 
 ## MCP 客户端配置
 
@@ -293,6 +342,12 @@ URL：http://127.0.0.1:12308/mcp
 | `browser_click` | 通过 CSS 选择器点击元素 |
 | `browser_fill` | 通过 CSS 选择器填写表单 |
 | `browser_eval` | 在当前标签页执行 JavaScript |
+| `script_list` | 列出扩展里保存的用户脚本 |
+| `script_install` | 安装一段 UserScript 源码 |
+| `script_remove` | 删除指定用户脚本 |
+| `script_set_enabled` | 启用或停用指定用户脚本 |
+| `script_run` | 手动运行已安装的用户脚本 |
+| `script_run_code` | 临时运行一段 UserScript/JavaScript 源码 |
 | `github_create_repository` | 在 GitHub 新建仓库页面填写并提交创建仓库表单 |
 | `github_inspect_new_repository_page` | 检查 GitHub 页面结构，用于调试自动提交 |
 | `github_update_repository_about` | 更新当前 GitHub 仓库的 About 描述和主页链接 |
@@ -305,6 +360,8 @@ URL：http://127.0.0.1:12308/mcp
 连接成功后，这个项目可以控制你的真实 Chrome 页面。我建议只在本机使用，并保持 WebSocket 监听地址为 `127.0.0.1`。
 
 `browser_eval` 能执行任意 JavaScript。我只建议在可信页面和明确知道代码含义时使用。
+
+用户脚本同样能读写页面 DOM，也能发起网络请求。安装第三方脚本前要先看源码，不要把不可信脚本交给 MCP 客户端自动安装。
 
 `github_delete_repository` 会真的删除 GitHub 仓库。这个工具是为了我自己的自动化流程准备的，不建议随便暴露给不可信客户端。
 

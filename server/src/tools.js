@@ -80,6 +80,72 @@ export function registerTools(server, bridge) {
   );
 
   server.tool(
+    "script_list",
+    "列出扩展里保存的用户脚本。",
+    {},
+    async () => textResult(await bridge.send("scripts.list"))
+  );
+
+  server.tool(
+    "script_install",
+    "安装一段 UserScript 源码。支持 ==UserScript== 元信息、@match、@include、@exclude、@grant。",
+    {
+      source: z.string().min(1),
+      name: z.string().default(""),
+      enabled: z.boolean().default(true)
+    },
+    async ({ source, name, enabled }) => textResult(await bridge.send("scripts.install", {
+      source,
+      name,
+      enabled
+    }))
+  );
+
+  server.tool(
+    "script_remove",
+    "删除指定用户脚本。",
+    {
+      id: z.string().min(1)
+    },
+    async ({ id }) => textResult(await bridge.send("scripts.remove", { id }))
+  );
+
+  server.tool(
+    "script_set_enabled",
+    "启用或停用指定用户脚本。启用后会在匹配页面加载完成时自动运行。",
+    {
+      id: z.string().min(1),
+      enabled: z.boolean()
+    },
+    async ({ id, enabled }) => textResult(await bridge.send("scripts.setEnabled", { id, enabled }))
+  );
+
+  server.tool(
+    "script_run",
+    "在当前标签页或指定标签页手动运行已安装的用户脚本。",
+    {
+      id: z.string().min(1),
+      tabId: z.number().int().optional()
+    },
+    async ({ id, tabId }) => textResult(await bridge.send("scripts.run", { id, tabId }))
+  );
+
+  server.tool(
+    "script_run_code",
+    "在当前标签页或指定标签页临时运行一段 UserScript/JavaScript 源码，不保存到脚本列表。",
+    {
+      source: z.string().min(1),
+      name: z.string().default("临时脚本"),
+      tabId: z.number().int().optional()
+    },
+    async ({ source, name, tabId }) => textResult(await bridge.send("scripts.runCode", {
+      source,
+      name,
+      tabId
+    }))
+  );
+
+  server.tool(
     "github_create_repository",
     "在 GitHub 新建仓库页面填写并提交创建仓库表单。",
     {
