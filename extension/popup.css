@@ -91,7 +91,8 @@ h2 {
   word-break: break-word;
 }
 
-.editor-actions {
+.editor-actions,
+.inline-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -255,7 +256,8 @@ button:disabled {
   height: auto;
 }
 
-.editor {
+.editor,
+.inline-editor {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid #d8dee3;
@@ -305,8 +307,25 @@ textarea {
   }
 }
 
-#editorMessage {
+#editorMessage,
+.inline-message {
   min-height: 20px;
   margin: 8px 0;
   font-size: 12px;
+  color: #50616d;
+}
+
+.inline-actions {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.inline-actions button:first-child {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.inline-actions button:last-child {
+  border-color: #b42318;
+  color: #b42318;
 }
