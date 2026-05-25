@@ -12,15 +12,18 @@
         <img src="icons/icon-48.png" alt="">
         <div>
           <h1>SS MCP Chrome</h1>
-          <p id="status">正在检查...</p>
+          <p class="status-line">
+            <span id="statusLight" class="status-light disconnected"></span>
+            <span id="status">正在检查...</span>
+          </p>
         </div>
       </header>
 
       <p id="detail"></p>
 
       <section class="connection">
-        <button id="connect" type="button">连接</button>
-        <button id="disconnect" type="button">断开</button>
+        <button id="connectionButton" type="button">连接</button>
+        <a href="https://github.com/google696/ss-mcp-chrome" target="_blank" rel="noreferrer">github.com/google696/ss-mcp-chrome</a>
       </section>
 
       <section class="scripts-header">

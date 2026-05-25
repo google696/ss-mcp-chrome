@@ -369,6 +369,8 @@ URL：http://127.0.0.1:12308/mcp
 
 ## 后续计划
 
+更完整的功能梳理放在 [docs/roadmap.md](docs/roadmap.md)。
+
 - Native Messaging 安装器
 - 扩展设置页
 - 页面元素选择器

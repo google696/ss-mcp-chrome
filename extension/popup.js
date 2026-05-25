@@ -1,7 +1,7 @@
 const statusEl = document.querySelector("#status");
+const statusLightEl = document.querySelector("#statusLight");
 const detailEl = document.querySelector("#detail");
-const connectButton = document.querySelector("#connect");
-const disconnectButton = document.querySelector("#disconnect");
+const connectionButton = document.querySelector("#connectionButton");
 const newScriptButton = document.querySelector("#newScript");
 const scriptListEl = document.querySelector("#scriptList");
 const editorEl = document.querySelector("#editor");
@@ -16,6 +16,7 @@ const deleteScriptButton = document.querySelector("#deleteScript");
 let scripts = [];
 let editingId = "";
 let activeUrl = "";
+let connectionState = "disconnected";
 
 const DEFAULT_SOURCE = `// ==UserScript==
 // @name         我的脚本
@@ -43,10 +44,17 @@ async function refreshActiveUrl() {
 }
 
 function renderStatus(response) {
-  statusEl.textContent = response.label || (response.connected ? "已连接" : "未连接");
+  connectionState = response.connected ? "connected" : (response.state || "disconnected");
+  if (connectionState !== "connecting" && connectionState !== "connected") {
+    connectionState = "disconnected";
+  }
+
+  statusEl.textContent = response.label || (connectionState === "connected" ? "已连接" : "未连接");
   detailEl.textContent = response.detail || "";
-  connectButton.disabled = response.state === "connecting";
-  disconnectButton.disabled = !response.connected && response.state !== "connecting";
+  statusLightEl.className = `status-light ${connectionState}`;
+  connectionButton.className = connectionState === "connected" ? "connected" : "disconnected";
+  connectionButton.disabled = connectionState === "connecting";
+  connectionButton.textContent = connectionState === "connected" ? "断开" : (connectionState === "connecting" ? "连接中..." : "连接");
 }
 
 async function refreshScripts() {
@@ -159,18 +167,19 @@ function setEditorMessage(message) {
   editorMessageEl.textContent = message;
 }
 
-connectButton.addEventListener("click", async () => {
+connectionButton.addEventListener("click", async () => {
+  if (connectionState === "connected") {
+    const response = await chrome.runtime.sendMessage({ type: "disconnect" });
+    renderStatus(response);
+    return;
+  }
+
   renderStatus({
     state: "connecting",
-    label: "正在连接...",
+    label: "连接中...",
     detail: "正在连接 ws://127.0.0.1:12307"
   });
   const response = await chrome.runtime.sendMessage({ type: "connect" });
-  renderStatus(response);
-});
-
-disconnectButton.addEventListener("click", async () => {
-  const response = await chrome.runtime.sendMessage({ type: "disconnect" });
   renderStatus(response);
 });
 

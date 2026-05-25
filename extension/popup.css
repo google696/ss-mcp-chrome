@@ -62,17 +62,54 @@ h2 {
   min-height: 20px;
 }
 
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.status-light {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #b42318;
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.12);
+}
+
+.status-light.connecting {
+  background: #c27803;
+  box-shadow: 0 0 0 3px rgba(194, 120, 3, 0.14);
+}
+
+.status-light.connected {
+  background: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+}
+
 #detail {
   min-height: 36px;
   margin: 10px 0;
   word-break: break-word;
 }
 
-.connection,
 .editor-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.connection {
+  display: grid;
+  gap: 8px;
+}
+
+.connection a {
+  overflow: hidden;
+  color: #0f5f9a;
+  font-size: 12px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scripts-header {
@@ -98,7 +135,13 @@ button:disabled {
   opacity: 0.55;
 }
 
-#connect,
+#connectionButton.connected {
+  border-color: #b42318;
+  background: #ffffff;
+  color: #b42318;
+}
+
+#connectionButton.disconnected,
 #saveScript {
   border-color: #0f766e;
   background: #0f766e;
