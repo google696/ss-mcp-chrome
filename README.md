@@ -295,6 +295,8 @@ Hermes 如果支持外部 MCP 服务，也按 stdio 方式接入：
 | `browser_click` | 通过 CSS 选择器点击元素 |
 | `browser_fill` | 通过 CSS 选择器填写表单 |
 | `browser_eval` | 在当前标签页执行 JavaScript |
+| `github_create_repository` | 在 GitHub 新建仓库页面填写并提交创建仓库表单 |
+| `github_inspect_new_repository_page` | 检查 GitHub 新建仓库页面结构，用于调试自动提交 |
 
 工具名保留英文是为了兼容 MCP 客户端、JSON Schema 和脚本调用。工具说明、界面和文档均使用中文。
 

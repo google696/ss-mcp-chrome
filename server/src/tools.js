@@ -69,6 +69,28 @@ export function registerTools(server, bridge) {
     },
     async ({ code }) => textResult(await bridge.send("page.eval", { code }))
   );
+
+  server.tool(
+    "github_create_repository",
+    "在 GitHub 新建仓库页面填写并提交创建仓库表单。",
+    {
+      name: z.string().min(1),
+      description: z.string().default(""),
+      visibility: z.enum(["public", "private"]).default("public")
+    },
+    async ({ name, description, visibility }) => textResult(await bridge.send("github.createRepository", {
+      name,
+      description,
+      visibility
+    }))
+  );
+
+  server.tool(
+    "github_inspect_new_repository_page",
+    "检查 GitHub 新建仓库页面的表单、按钮和输入框结构，用于调试自动提交。",
+    {},
+    async () => textResult(await bridge.send("github.inspectNewRepositoryPage"))
+  );
 }
 
 function textResult(value) {

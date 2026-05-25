@@ -174,6 +174,10 @@ async function dispatchAction(action, payload) {
       return await runInActiveTab(fillElement, [payload.selector, payload.value]);
     case "page.eval":
       return await runInActiveTab(evalCode, [payload.code]);
+    case "github.createRepository":
+      return await runInActiveTab(createGithubRepository, [payload]);
+    case "github.inspectNewRepositoryPage":
+      return await runInActiveTab(inspectGithubNewRepositoryPage);
     default:
       throw new Error(`未知动作：${action}`);
   }
@@ -277,6 +281,117 @@ function fillElement(selector, value) {
 }
 
 function evalCode(code) {
-  const indirectEval = eval;
-  return indirectEval(code);
+  try {
+    return Function(`"use strict"; return (${code});`)();
+  } catch {
+    return Function(`"use strict"; ${code}`)();
+  }
+}
+
+function createGithubRepository({ name, description = "", visibility = "public" }) {
+  const setValue = (element, value) => {
+    if (!element) return false;
+    element.focus();
+    const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+    if (setter) setter.call(element, value);
+    else element.value = value;
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    element.blur();
+    return true;
+  };
+
+  const clickIfNeeded = (selector, checked) => {
+    const element = document.querySelector(selector);
+    if (element && element.checked !== checked) element.click();
+  };
+
+  const repoName = document.querySelector("#repository-name-input, #repository_name, input[name='repository[name]']");
+  const repoDescription = document.querySelector("input[name='Description'], #repository_description, input[name='repository[description]']");
+  setValue(repoName, name);
+  setValue(repoDescription, description);
+
+  if (visibility === "private") {
+    clickIfNeeded("input[value='private'], #repository_visibility_private", true);
+  } else {
+    clickIfNeeded("input[value='public'], #repository_visibility_public", true);
+  }
+
+  clickIfNeeded("input[name='repository[auto_init]']", false);
+  const gitignore = document.querySelector("select[name='repository[gitignore_template]']");
+  if (gitignore) {
+    gitignore.value = "";
+    gitignore.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  const license = document.querySelector("select[name='repository[license_template]']");
+  if (license) {
+    license.value = "";
+    license.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  const submitButton = [...document.querySelectorAll("button, input[type='submit'], [role='button']")]
+    .find((element) => (element.innerText || element.value || "").trim() === "Create repository");
+
+  if (!submitButton) {
+    return {
+      submitted: false,
+      reason: "没有找到 GitHub 创建仓库按钮",
+      url: location.href,
+      text: document.body.innerText.slice(0, 1000)
+    };
+  }
+
+  submitButton.scrollIntoView({ block: "center", inline: "center" });
+  submitButton.focus();
+  submitButton.click();
+
+  return {
+    submitted: true,
+    repoName: repoName?.value || "",
+    description: repoDescription?.value || "",
+    disabled: submitButton.disabled,
+    url: location.href
+  };
+}
+
+function inspectGithubNewRepositoryPage() {
+  const visibleText = (element) => (element.innerText || element.value || "").trim();
+  return {
+    url: location.href,
+    title: document.title,
+    inputs: [...document.querySelectorAll("input, textarea, select")].map((element, index) => ({
+      index,
+      tag: element.tagName,
+      type: element.type,
+      name: element.name,
+      id: element.id,
+      value: element.value,
+      checked: element.checked,
+      disabled: element.disabled,
+      placeholder: element.placeholder,
+      ariaLabel: element.getAttribute("aria-label"),
+      testId: element.getAttribute("data-testid")
+    })),
+    buttons: [...document.querySelectorAll("button, input[type='submit'], [role='button']")].map((element, index) => ({
+      index,
+      tag: element.tagName,
+      type: element.type,
+      text: visibleText(element),
+      disabled: element.disabled,
+      ariaDisabled: element.getAttribute("aria-disabled"),
+      id: element.id,
+      name: element.name,
+      className: String(element.className || ""),
+      ariaLabel: element.getAttribute("aria-label"),
+      testId: element.getAttribute("data-testid")
+    })),
+    forms: [...document.querySelectorAll("form")].map((element, index) => ({
+      index,
+      action: element.action,
+      method: element.method,
+      text: element.innerText.slice(0, 300)
+    })),
+    bodyText: document.body.innerText.slice(0, 1500)
+  };
 }
