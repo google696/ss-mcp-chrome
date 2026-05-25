@@ -1,0 +1,32 @@
+{
+  "name": "ss-mcp-chrome",
+  "version": "0.1.0",
+  "private": false,
+  "description": "一套自有实现的 Chrome 自动化 MCP 服务，通过本地 WebSocket 桥接 Chrome 扩展。",
+  "type": "module",
+  "bin": {
+    "ss-mcp-chrome": "./server/src/index.js"
+  },
+  "scripts": {
+    "start": "node ./server/src/index.js",
+    "bridge": "node ./server/src/index.js",
+    "dev": "node --watch ./server/src/index.js",
+    "check": "node ./server/src/index.js --check"
+  },
+  "keywords": [
+    "mcp",
+    "chrome",
+    "browser-automation",
+    "model-context-protocol"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "ws": "^8.18.3",
+    "zod": "^3.25.76"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
