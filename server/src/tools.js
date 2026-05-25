@@ -19,6 +19,15 @@ export function registerTools(server, bridge) {
   );
 
   server.tool(
+    "browser_switch_tab",
+    "切换到指定 Chrome 标签页。",
+    {
+      tabId: z.number().int()
+    },
+    async ({ tabId }) => textResult(await bridge.send("tabs.switch", { tabId }))
+  );
+
+  server.tool(
     "browser_navigate",
     "让当前标签页或新标签页打开指定网址。",
     {
@@ -87,9 +96,31 @@ export function registerTools(server, bridge) {
 
   server.tool(
     "github_inspect_new_repository_page",
-    "检查 GitHub 新建仓库页面的表单、按钮和输入框结构，用于调试自动提交。",
+    "检查 GitHub 页面表单、按钮和输入框结构，用于调试自动提交。",
     {},
     async () => textResult(await bridge.send("github.inspectNewRepositoryPage"))
+  );
+
+  server.tool(
+    "github_update_repository_about",
+    "更新当前 GitHub 仓库的 About 描述和主页链接。",
+    {
+      description: z.string().default(""),
+      homepage: z.string().default("")
+    },
+    async ({ description, homepage }) => textResult(await bridge.send("github.updateRepositoryAbout", {
+      description,
+      homepage
+    }))
+  );
+
+  server.tool(
+    "github_delete_repository",
+    "删除指定 GitHub 仓库。fullName 必须是 owner/repo，例如 google696/ss。",
+    {
+      fullName: z.string().regex(/^[-\w]+\/[-.\w]+$/)
+    },
+    async ({ fullName }) => textResult(await bridge.send("github.deleteRepository", { fullName }))
   );
 }
 

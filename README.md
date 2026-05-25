@@ -289,6 +289,7 @@ Hermes 如果支持外部 MCP 服务，也按 stdio 方式接入：
 | --- | --- |
 | `browser_status` | 检查扩展是否已连接 |
 | `browser_tabs` | 列出 Chrome 窗口和标签页 |
+| `browser_switch_tab` | 切换到指定 Chrome 标签页 |
 | `browser_navigate` | 控制当前标签页或新标签页打开网址 |
 | `browser_read_page` | 读取当前页面文字和元信息 |
 | `browser_screenshot` | 截取当前标签页可见区域 |
@@ -297,6 +298,8 @@ Hermes 如果支持外部 MCP 服务，也按 stdio 方式接入：
 | `browser_eval` | 在当前标签页执行 JavaScript |
 | `github_create_repository` | 在 GitHub 新建仓库页面填写并提交创建仓库表单 |
 | `github_inspect_new_repository_page` | 检查 GitHub 新建仓库页面结构，用于调试自动提交 |
+| `github_update_repository_about` | 更新当前 GitHub 仓库的 About 描述和主页链接 |
+| `github_delete_repository` | 删除指定 GitHub 仓库 |
 
 工具名保留英文是为了兼容 MCP 客户端、JSON Schema 和脚本调用。工具说明、界面和文档均使用中文。
 

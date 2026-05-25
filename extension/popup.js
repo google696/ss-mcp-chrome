@@ -16,7 +16,11 @@ function renderStatus(response) {
 }
 
 connectButton.addEventListener("click", async () => {
-  renderStatus({ state: "connecting", label: "正在连接...", detail: "正在连接 ws://127.0.0.1:12307" });
+  renderStatus({
+    state: "connecting",
+    label: "正在连接...",
+    detail: "正在连接 ws://127.0.0.1:12307"
+  });
   const response = await chrome.runtime.sendMessage({ type: "connect" });
   renderStatus(response);
 });

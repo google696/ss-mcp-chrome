@@ -162,6 +162,8 @@ async function dispatchAction(action, payload) {
   switch (action) {
     case "tabs.list":
       return await listTabs();
+    case "tabs.switch":
+      return await switchTab(payload);
     case "tabs.navigate":
       return await navigate(payload);
     case "page.read":
@@ -178,9 +180,20 @@ async function dispatchAction(action, payload) {
       return await runInActiveTab(createGithubRepository, [payload]);
     case "github.inspectNewRepositoryPage":
       return await runInActiveTab(inspectGithubNewRepositoryPage);
+    case "github.updateRepositoryAbout":
+      return await runInActiveTab(updateGithubRepositoryAbout, [payload]);
+    case "github.deleteRepository":
+      return await runInActiveTab(deleteGithubRepository, [payload]);
     default:
       throw new Error(`未知动作：${action}`);
   }
+}
+
+async function switchTab({ tabId }) {
+  if (!Number.isInteger(tabId)) throw new Error("tabId 必须是整数");
+  const tab = await chrome.tabs.update(tabId, { active: true });
+  if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true });
+  return { tabId: tab.id, title: tab.title, url: tab.url };
 }
 
 async function listTabs() {
@@ -286,6 +299,138 @@ function evalCode(code) {
   } catch {
     return Function(`"use strict"; ${code}`)();
   }
+}
+
+async function updateGithubRepositoryAbout({ description = "", homepage = "" }) {
+  const repoMatch = location.pathname.match(/^\/([^/]+)\/([^/]+)/);
+  if (!repoMatch) throw new Error("当前页面不是 GitHub 仓库页面");
+
+  const [, owner, repo] = repoMatch;
+  const targetPath = `/${owner}/${repo}/settings/update_meta`;
+  const editButton = [...document.querySelectorAll("button, a")]
+    .find((element) => /edit/i.test(element.textContent || "") && element.closest("aside, .Layout-sidebar, [class*='sidebar']"));
+  editButton?.click();
+  await new Promise((resolve) => setTimeout(resolve, 300));
+
+  const descriptionInput = document.querySelector("#repo_description, input[name='repo_description']");
+  const homepageInput = document.querySelector("#repo_homepage, input[name='repo_homepage']");
+  const form = descriptionInput?.closest("form") || document.querySelector(`form[action$="${targetPath}"], form[action*="/settings/update_meta"]`);
+  if (!form) throw new Error("没有找到 GitHub About 表单");
+
+  const setValue = (element, value) => {
+    if (!element) return;
+    const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+    if (setter) setter.call(element, value);
+    else element.value = value;
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  setValue(descriptionInput, description);
+  setValue(homepageInput, homepage);
+
+  const body = new FormData(form);
+  body.set("repo_description", description);
+  body.set("repo_homepage", homepage);
+
+  const response = await fetch(form.action || targetPath, {
+    method: "POST",
+    body,
+    credentials: "same-origin",
+    headers: {
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    }
+  });
+
+  if (!response.ok && !response.redirected) {
+    throw new Error(`GitHub About 保存失败：HTTP ${response.status}`);
+  }
+
+  location.href = `/${owner}/${repo}`;
+  return {
+    updated: true,
+    owner,
+    repo,
+    description,
+    homepage,
+    status: response.status,
+    redirected: response.redirected
+  };
+}
+
+async function deleteGithubRepository({ fullName }) {
+  if (!/^[-\w]+\/[-.\w]+$/.test(fullName || "")) {
+    throw new Error("fullName 必须是 owner/repo 格式");
+  }
+
+  const [owner, repo] = fullName.split("/");
+  const expectedSettingsPath = `/${owner}/${repo}/settings`;
+  if (location.pathname !== expectedSettingsPath) {
+    location.href = expectedSettingsPath;
+    return { step: "navigating", fullName, url: location.href };
+  }
+
+  const clickButtonByText = (patterns) => {
+    const button = [...document.querySelectorAll("button, input[type='submit'], [role='button']")]
+      .find((element) => {
+        const text = (element.innerText || element.value || element.getAttribute("aria-label") || "").trim();
+        return patterns.some((pattern) => pattern.test(text));
+      });
+    if (!button) return false;
+    button.scrollIntoView({ block: "center", inline: "center" });
+    button.click();
+    return true;
+  };
+
+  const setInput = (selector, value) => {
+    const element = document.querySelector(selector);
+    if (!element) return false;
+    element.focus();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    if (setter) setter.call(element, value);
+    else element.value = value;
+    element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  };
+
+  const deleteForm = document.querySelector(`form[action$="/${owner}/${repo}/settings/delete"], form[action$="/settings/delete"]`);
+  const visibleVerify = [...document.querySelectorAll("input[name='verify']:not([type='hidden']), input[aria-label], input[type='text']")]
+    .find((element) => element.offsetParent !== null);
+  if (visibleVerify) {
+    setInput("input[name='verify']:not([type='hidden']), input[type='text']", fullName);
+  }
+
+  if (deleteForm) {
+    const body = new FormData(deleteForm);
+    body.set("verify", fullName);
+    const response = await fetch(deleteForm.action, {
+      method: "POST",
+      body,
+      credentials: "same-origin",
+      headers: {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      }
+    });
+    return {
+      step: "submitted",
+      fullName,
+      status: response.status,
+      redirected: response.redirected,
+      finalUrl: response.url
+    };
+  }
+
+  if (clickButtonByText([/^Delete this repository$/i, /^I want to delete this repository$/i, /^I have read and understand/i])) {
+    return { step: "clicked", fullName };
+  }
+
+  return {
+    step: "blocked",
+    fullName,
+    text: document.body.innerText.slice(0, 1500)
+  };
 }
 
 function createGithubRepository({ name, description = "", visibility = "public" }) {
