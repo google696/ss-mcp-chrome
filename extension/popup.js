@@ -82,9 +82,6 @@ function renderScripts() {
     row.className = matched ? "script-row matched" : "script-row";
     row.title = matched ? `当前页面命中：${activeUrl}` : "";
 
-    const top = document.createElement("div");
-    top.className = "script-row-top";
-
     const checkbox = document.createElement("input");
     checkbox.className = "toggle";
     checkbox.type = "checkbox";
@@ -107,6 +104,10 @@ function renderScripts() {
     meta.textContent = matched ? "当前页面匹配" : getPrimaryPattern(script);
 
     main.append(name, meta);
+
+    if (expanded) {
+      main.append(createPatternDetails(script));
+    }
 
     const expandButton = document.createElement("button");
     expandButton.className = "expand-button";
@@ -135,13 +136,7 @@ function renderScripts() {
       setEditorMessage(result.result?.ok === false ? `运行失败：${result.result.error}` : "脚本已运行");
     });
 
-    top.append(checkbox, main, expandButton, editButton, runButton);
-    row.append(top);
-
-    if (expanded) {
-      row.append(createPatternDetails(script));
-    }
-
+    row.append(checkbox, main, expandButton, editButton, runButton);
     scriptListEl.append(row);
   }
 }
