@@ -15,7 +15,8 @@
     "scripting",
     "tabs",
     "storage",
-    "userScripts"
+    "userScripts",
+    "sidePanel"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -24,8 +25,10 @@
     "service_worker": "service-worker.js",
     "type": "module"
   },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
   "action": {
-    "default_popup": "popup.html",
     "default_title": "SS MCP Chrome",
     "default_icon": {
       "16": "icons/icon-16.png",
