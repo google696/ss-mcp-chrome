@@ -9,6 +9,7 @@ body {
   font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #172026;
   background: #f7f8f9;
+  overflow-y: auto;
 }
 
 main {
@@ -113,8 +114,6 @@ button:disabled {
   display: grid;
   gap: 8px;
   margin-top: 10px;
-  max-height: 30vh;
-  overflow: auto;
 }
 
 .empty {
@@ -210,11 +209,19 @@ input {
 }
 
 textarea {
-  min-height: 240px;
-  max-height: 48vh;
+  min-height: 128px;
+  height: 28vh;
+  max-height: calc(100vh - 360px);
   padding: 8px;
   resize: vertical;
   font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
+}
+
+@media (max-height: 720px) {
+  textarea {
+    height: 150px;
+    max-height: none;
+  }
 }
 
 #editorMessage {
