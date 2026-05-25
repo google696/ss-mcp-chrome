@@ -307,6 +307,20 @@ textarea {
   }
 }
 
+.inline-editor input {
+  height: 40px;
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.inline-editor textarea {
+  min-height: 220px;
+  height: 36vh;
+  max-height: min(520px, calc(100vh - 300px));
+  padding: 10px;
+  font-size: 13px;
+}
+
 #editorMessage,
 .inline-message {
   min-height: 20px;
