@@ -2,6 +2,34 @@ const statusEl = document.querySelector("#status");
 const detailEl = document.querySelector("#detail");
 const connectButton = document.querySelector("#connect");
 const disconnectButton = document.querySelector("#disconnect");
+const newScriptButton = document.querySelector("#newScript");
+const scriptListEl = document.querySelector("#scriptList");
+const editorEl = document.querySelector("#editor");
+const editorTitleEl = document.querySelector("#editorTitle");
+const closeEditorButton = document.querySelector("#closeEditor");
+const scriptNameEl = document.querySelector("#scriptName");
+const scriptSourceEl = document.querySelector("#scriptSource");
+const editorMessageEl = document.querySelector("#editorMessage");
+const runScriptButton = document.querySelector("#runScript");
+const deleteScriptButton = document.querySelector("#deleteScript");
+
+let scripts = [];
+let editingId = "";
+
+const DEFAULT_SOURCE = `// ==UserScript==
+// @name         我的脚本
+// @match        https://example.com/*
+// @grant        GM_log
+// ==/UserScript==
+
+GM_log("当前标题", document.title);
+`;
+
+async function sendAction(action, payload = {}) {
+  const response = await chrome.runtime.sendMessage({ type: "action", action, payload });
+  if (!response?.ok) throw new Error(response?.error || "操作失败");
+  return response.result;
+}
 
 async function refreshStatus() {
   const response = await chrome.runtime.sendMessage({ type: "status" });
@@ -13,6 +41,90 @@ function renderStatus(response) {
   detailEl.textContent = response.detail || "";
   connectButton.disabled = response.state === "connecting";
   disconnectButton.disabled = !response.connected && response.state !== "connecting";
+}
+
+async function refreshScripts() {
+  const result = await sendAction("scripts.list");
+  scripts = result.scripts || [];
+  renderScripts();
+}
+
+function renderScripts() {
+  scriptListEl.textContent = "";
+  if (!scripts.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "还没有脚本";
+    scriptListEl.append(empty);
+    return;
+  }
+
+  for (const script of scripts) {
+    const row = document.createElement("div");
+    row.className = "script-row";
+
+    const checkbox = document.createElement("input");
+    checkbox.className = "toggle";
+    checkbox.type = "checkbox";
+    checkbox.checked = script.enabled;
+    checkbox.title = script.enabled ? "停用" : "启用";
+    checkbox.addEventListener("change", async () => {
+      await sendAction("scripts.setEnabled", { id: script.id, enabled: checkbox.checked });
+      await refreshScripts();
+    });
+
+    const main = document.createElement("div");
+    main.className = "script-main";
+
+    const name = document.createElement("div");
+    name.className = "script-name";
+    name.textContent = script.name || script.id;
+
+    const meta = document.createElement("div");
+    meta.className = "script-meta";
+    meta.textContent = (script.matches || []).join(", ") || "*://*/*";
+
+    main.append(name, meta);
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.textContent = "编辑";
+    editButton.addEventListener("click", () => openEditor(script));
+
+    const runButton = document.createElement("button");
+    runButton.type = "button";
+    runButton.textContent = "运行";
+    runButton.addEventListener("click", async () => {
+      setEditorMessage("正在运行...");
+      const result = await sendAction("scripts.run", { id: script.id });
+      setEditorMessage(result.result?.ok === false ? `运行失败：${result.result.error}` : "脚本已运行");
+    });
+
+    row.append(checkbox, main, editButton, runButton);
+    scriptListEl.append(row);
+  }
+}
+
+function openEditor(script = null) {
+  editingId = script?.id || "";
+  editorTitleEl.textContent = editingId ? "编辑脚本" : "新建脚本";
+  scriptNameEl.value = script?.name || "";
+  scriptSourceEl.value = script?.source || DEFAULT_SOURCE;
+  deleteScriptButton.hidden = !editingId;
+  runScriptButton.textContent = editingId ? "运行" : "临时运行";
+  setEditorMessage("");
+  editorEl.hidden = false;
+  scriptNameEl.focus();
+}
+
+function closeEditor() {
+  editingId = "";
+  editorEl.hidden = true;
+  setEditorMessage("");
+}
+
+function setEditorMessage(message) {
+  editorMessageEl.textContent = message;
 }
 
 connectButton.addEventListener("click", async () => {
@@ -30,4 +142,43 @@ disconnectButton.addEventListener("click", async () => {
   renderStatus(response);
 });
 
-refreshStatus();
+newScriptButton.addEventListener("click", () => openEditor());
+closeEditorButton.addEventListener("click", closeEditor);
+
+editorEl.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setEditorMessage("正在保存...");
+  if (editingId) {
+    await sendAction("scripts.remove", { id: editingId });
+  }
+  const result = await sendAction("scripts.install", {
+    name: scriptNameEl.value.trim(),
+    source: scriptSourceEl.value,
+    enabled: true
+  });
+  editingId = result.script.id;
+  setEditorMessage("已保存");
+  await refreshScripts();
+  openEditor(scripts.find((script) => script.id === editingId));
+});
+
+runScriptButton.addEventListener("click", async () => {
+  setEditorMessage("正在运行...");
+  const result = editingId
+    ? await sendAction("scripts.run", { id: editingId })
+    : await sendAction("scripts.runCode", {
+      name: scriptNameEl.value.trim() || "临时脚本",
+      source: scriptSourceEl.value
+    });
+  setEditorMessage(result.result?.ok === false ? `运行失败：${result.result.error}` : "脚本已运行");
+});
+
+deleteScriptButton.addEventListener("click", async () => {
+  if (!editingId) return;
+  await sendAction("scripts.remove", { id: editingId });
+  closeEditor();
+  await refreshScripts();
+});
+
+await refreshStatus();
+await refreshScripts();

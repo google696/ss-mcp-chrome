@@ -27,6 +27,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "action") {
+    dispatchAction(message.action, message.payload || {})
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
   return false;
 });
 
@@ -495,6 +502,7 @@ function toScriptSummary(script) {
     excludes: script.excludes || [],
     grants: script.grants || [],
     runAt: script.runAt || "document-idle",
+    source: script.source || "",
     createdAt: script.createdAt || "",
     updatedAt: script.updatedAt || ""
   };

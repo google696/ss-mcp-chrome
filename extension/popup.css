@@ -1,7 +1,11 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
-  width: 300px;
+  width: 420px;
   margin: 0;
-  font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #172026;
   background: #f7f8f9;
 }
@@ -10,50 +14,196 @@ main {
   padding: 14px;
 }
 
-header {
+.app-header,
+.scripts-header,
+.editor-title,
+.editor-actions,
+.script-row {
   display: flex;
   align-items: center;
+}
+
+.app-header {
   gap: 10px;
 }
 
-img {
+.app-header img {
   width: 42px;
   height: 42px;
   border-radius: 10px;
 }
 
+h1,
+h2,
+p {
+  margin: 0;
+}
+
 h1 {
-  margin: 0 0 2px;
   font-size: 16px;
   font-weight: 650;
 }
 
+h2 {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+#status,
+#detail,
+.script-meta,
+#editorMessage {
+  color: #50616d;
+}
+
 #status {
   min-height: 20px;
-  margin: 0;
-  color: #50616d;
 }
 
 #detail {
-  min-height: 38px;
-  margin: 12px 0;
-  color: #50616d;
+  min-height: 36px;
+  margin: 10px 0;
   word-break: break-word;
 }
 
+.connection,
+.editor-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.scripts-header {
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #d8dee3;
+}
+
 button {
-  width: 100%;
-  height: 34px;
-  margin-top: 8px;
+  min-width: 0;
+  height: 32px;
   border: 1px solid #b8c2ca;
   border-radius: 6px;
   background: #ffffff;
   color: #172026;
   cursor: pointer;
+  white-space: nowrap;
 }
 
-button:first-of-type {
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+#connect,
+#saveScript {
   border-color: #0f766e;
   background: #0f766e;
   color: #ffffff;
+}
+
+#deleteScript {
+  border-color: #b42318;
+  color: #b42318;
+}
+
+.script-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  max-height: 190px;
+  overflow: auto;
+}
+
+.empty {
+  padding: 12px;
+  border: 1px dashed #b8c2ca;
+  border-radius: 6px;
+  color: #50616d;
+  text-align: center;
+}
+
+.script-row {
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #d8dee3;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.script-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.script-name {
+  overflow: hidden;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-meta {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-row button {
+  width: 48px;
+}
+
+.toggle {
+  width: auto;
+  height: auto;
+}
+
+.editor {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #d8dee3;
+}
+
+.editor-title {
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+label {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #50616d;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid #b8c2ca;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172026;
+  font: inherit;
+}
+
+input {
+  height: 32px;
+  padding: 0 8px;
+}
+
+textarea {
+  min-height: 170px;
+  max-height: 260px;
+  padding: 8px;
+  resize: vertical;
+  font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
+}
+
+#editorMessage {
+  min-height: 20px;
+  margin: 8px 0;
+  font-size: 12px;
 }

@@ -8,16 +8,52 @@
   </head>
   <body>
     <main>
-      <header>
+      <header class="app-header">
         <img src="icons/icon-48.png" alt="">
         <div>
           <h1>SS MCP Chrome</h1>
           <p id="status">正在检查...</p>
         </div>
       </header>
+
       <p id="detail"></p>
-      <button id="connect" type="button">连接</button>
-      <button id="disconnect" type="button">断开</button>
+
+      <section class="connection">
+        <button id="connect" type="button">连接</button>
+        <button id="disconnect" type="button">断开</button>
+      </section>
+
+      <section class="scripts-header">
+        <h2>脚本</h2>
+        <button id="newScript" type="button">新建</button>
+      </section>
+
+      <section id="scriptList" class="script-list"></section>
+
+      <form id="editor" class="editor" hidden>
+        <div class="editor-title">
+          <strong id="editorTitle">新建脚本</strong>
+          <button id="closeEditor" type="button">关闭</button>
+        </div>
+
+        <label>
+          名称
+          <input id="scriptName" type="text" autocomplete="off" placeholder="脚本名称">
+        </label>
+
+        <label>
+          源码
+          <textarea id="scriptSource" spellcheck="false"></textarea>
+        </label>
+
+        <p id="editorMessage"></p>
+
+        <div class="editor-actions">
+          <button id="saveScript" type="submit">保存</button>
+          <button id="runScript" type="button">运行</button>
+          <button id="deleteScript" type="button">删除</button>
+        </div>
+      </form>
     </main>
     <script src="popup.js" type="module"></script>
   </body>
