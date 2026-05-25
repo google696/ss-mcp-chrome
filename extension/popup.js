@@ -15,6 +15,7 @@ const deleteScriptButton = document.querySelector("#deleteScript");
 
 let scripts = [];
 let editingId = "";
+let activeUrl = "";
 
 const DEFAULT_SOURCE = `// ==UserScript==
 // @name         我的脚本
@@ -36,6 +37,11 @@ async function refreshStatus() {
   renderStatus(response);
 }
 
+async function refreshActiveUrl() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  activeUrl = tab?.url || "";
+}
+
 function renderStatus(response) {
   statusEl.textContent = response.label || (response.connected ? "已连接" : "未连接");
   detailEl.textContent = response.detail || "";
@@ -44,6 +50,7 @@ function renderStatus(response) {
 }
 
 async function refreshScripts() {
+  await refreshActiveUrl();
   const result = await sendAction("scripts.list");
   scripts = result.scripts || [];
   renderScripts();
@@ -60,8 +67,10 @@ function renderScripts() {
   }
 
   for (const script of scripts) {
+    const matched = isScriptMatched(script, activeUrl);
     const row = document.createElement("div");
-    row.className = "script-row";
+    row.className = matched ? "script-row matched" : "script-row";
+    row.title = matched ? `当前页面命中：${activeUrl}` : "";
 
     const checkbox = document.createElement("input");
     checkbox.className = "toggle";
@@ -82,7 +91,7 @@ function renderScripts() {
 
     const meta = document.createElement("div");
     meta.className = "script-meta";
-    meta.textContent = (script.matches || []).join(", ") || "*://*/*";
+    meta.textContent = matched ? "当前页面匹配" : ((script.matches || []).join(", ") || "*://*/*");
 
     main.append(name, meta);
 
@@ -103,6 +112,29 @@ function renderScripts() {
     row.append(checkbox, main, editButton, runButton);
     scriptListEl.append(row);
   }
+}
+
+function isScriptMatched(script, url) {
+  if (!url || !/^https?:\/\//i.test(url)) return false;
+  const excludes = script.excludes || [];
+  if (excludes.some((pattern) => matchesPattern(pattern, url))) return false;
+
+  const includes = script.includes || [];
+  if (includes.length && includes.some((pattern) => matchesPattern(pattern, url))) return true;
+
+  const matches = script.matches?.length ? script.matches : ["*://*/*"];
+  return matches.some((pattern) => matchesPattern(pattern, url));
+}
+
+function matchesPattern(pattern, url) {
+  if (!pattern || pattern === "<all_urls>") return true;
+  if (pattern.startsWith("/") && pattern.endsWith("/")) {
+    return new RegExp(pattern.slice(1, -1)).test(url);
+  }
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`).test(url);
 }
 
 function openEditor(script = null) {

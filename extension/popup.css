@@ -132,6 +132,20 @@ button:disabled {
   background: #ffffff;
 }
 
+.script-row.matched {
+  border-color: #0f766e;
+  background: #e6f5f2;
+}
+
+.script-row.matched .script-name {
+  color: #0b5f59;
+}
+
+.script-row.matched .script-meta {
+  color: #0f766e;
+  font-weight: 620;
+}
+
 .script-main {
   min-width: 0;
   flex: 1;
