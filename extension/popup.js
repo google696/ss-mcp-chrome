@@ -17,6 +17,7 @@ let scripts = [];
 let editingId = "";
 let activeUrl = "";
 let connectionState = "disconnected";
+const expandedScripts = new Set();
 
 const DEFAULT_SOURCE = `// ==UserScript==
 // @name         我的脚本
@@ -76,9 +77,13 @@ function renderScripts() {
 
   for (const script of scripts) {
     const matched = isScriptMatched(script, activeUrl);
+    const expanded = expandedScripts.has(script.id);
     const row = document.createElement("div");
     row.className = matched ? "script-row matched" : "script-row";
     row.title = matched ? `当前页面命中：${activeUrl}` : "";
+
+    const top = document.createElement("div");
+    top.className = "script-row-top";
 
     const checkbox = document.createElement("input");
     checkbox.className = "toggle";
@@ -99,9 +104,22 @@ function renderScripts() {
 
     const meta = document.createElement("div");
     meta.className = "script-meta";
-    meta.textContent = matched ? "当前页面匹配" : ((script.matches || []).join(", ") || "*://*/*");
+    meta.textContent = matched ? "当前页面匹配" : getPrimaryPattern(script);
 
     main.append(name, meta);
+
+    const expandButton = document.createElement("button");
+    expandButton.className = "expand-button";
+    expandButton.type = "button";
+    expandButton.textContent = expanded ? "收起" : "展开";
+    expandButton.addEventListener("click", () => {
+      if (expandedScripts.has(script.id)) {
+        expandedScripts.delete(script.id);
+      } else {
+        expandedScripts.add(script.id);
+      }
+      renderScripts();
+    });
 
     const editButton = document.createElement("button");
     editButton.type = "button";
@@ -117,9 +135,60 @@ function renderScripts() {
       setEditorMessage(result.result?.ok === false ? `运行失败：${result.result.error}` : "脚本已运行");
     });
 
-    row.append(checkbox, main, editButton, runButton);
+    top.append(checkbox, main, expandButton, editButton, runButton);
+    row.append(top);
+
+    if (expanded) {
+      row.append(createPatternDetails(script));
+    }
+
     scriptListEl.append(row);
   }
+}
+
+function getPrimaryPattern(script) {
+  return script.matches?.[0] || script.includes?.[0] || "*://*/*";
+}
+
+function createPatternDetails(script) {
+  const details = document.createElement("div");
+  details.className = "script-details";
+
+  const groups = [
+    ["匹配", script.matches || []],
+    ["包含", script.includes || []],
+    ["排除", script.excludes || []]
+  ];
+
+  for (const [label, patterns] of groups) {
+    if (!patterns.length) continue;
+    const group = document.createElement("div");
+    group.className = "pattern-group";
+
+    const title = document.createElement("span");
+    title.className = "pattern-label";
+    title.textContent = label;
+
+    const list = document.createElement("div");
+    list.className = "pattern-list";
+    for (const pattern of patterns) {
+      const item = document.createElement("code");
+      item.textContent = pattern;
+      list.append(item);
+    }
+
+    group.append(title, list);
+    details.append(group);
+  }
+
+  if (!details.children.length) {
+    const fallback = document.createElement("div");
+    fallback.className = "pattern-group";
+    fallback.textContent = "匹配：*://*/*";
+    details.append(fallback);
+  }
+
+  return details;
 }
 
 function isScriptMatched(script, url) {
@@ -217,6 +286,7 @@ runScriptButton.addEventListener("click", async () => {
 deleteScriptButton.addEventListener("click", async () => {
   if (!editingId) return;
   await sendAction("scripts.remove", { id: editingId });
+  expandedScripts.delete(editingId);
   closeEditor();
   await refreshScripts();
 });

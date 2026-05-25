@@ -19,8 +19,7 @@ main {
 .app-header,
 .scripts-header,
 .editor-title,
-.editor-actions,
-.script-row {
+.editor-actions {
   display: flex;
   align-items: center;
 }
@@ -168,11 +167,17 @@ button:disabled {
 }
 
 .script-row {
-  gap: 8px;
   padding: 8px;
   border: 1px solid #d8dee3;
   border-radius: 6px;
   background: #ffffff;
+}
+
+.script-row-top {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
 }
 
 .script-row.matched {
@@ -191,7 +196,6 @@ button:disabled {
 
 .script-main {
   min-width: 0;
-  flex: 1;
 }
 
 .script-name {
@@ -210,6 +214,43 @@ button:disabled {
 
 .script-row button {
   width: 48px;
+}
+
+.script-row .expand-button {
+  width: 42px;
+}
+
+.script-details {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 8px 8px 8px 30px;
+  border-top: 1px solid #d8dee3;
+}
+
+.pattern-group {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.pattern-label {
+  color: #50616d;
+  font-size: 12px;
+}
+
+.pattern-list {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pattern-list code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: #172026;
+  font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
 }
 
 .toggle {
