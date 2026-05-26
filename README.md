@@ -85,15 +85,23 @@ SS_MCP_CHROME_DEBUG_HTTP=0 npm start
 
 ## Native Messaging 一键启动
 
-扩展支持通过 Native Messaging 启动本地桥接服务。首次使用前需要注册 Native Host。
+扩展支持通过 Native Messaging 启动本地桥接服务。首次使用前，客户电脑必须注册 Native Host。
 
-1. 在 `chrome://extensions/` 打开 SS MCP Chrome 的详情页
-2. 复制扩展 ID
-3. 在项目目录执行：
+新版 manifest 已内置固定扩展 ID：`innecgngdpcbjngmbepnjfjcakephcdk`。客户加载新版扩展后，在项目目录执行：
+
+```bash
+npm run native:install
+```
+
+安装脚本会自动从 `extension/manifest.json` 推导扩展 ID，并写入 Chrome 当前用户的 Native Messaging 注册表项。
+
+如果使用的是旧版扩展，或手动改过 manifest key，也可以显式指定扩展 ID：
 
 ```bash
 npm run native:install -- --extension-id=你的扩展ID
 ```
+
+如果侧边栏点击“启动本地服务”提示 `Specified native messaging host not found.`，说明这台电脑还没有注册 Native Host，或注册时的扩展 ID 和当前 Chrome 扩展 ID 不一致。重新加载新版扩展后再运行 `npm run native:install` 即可。
 
 安装完成后，扩展侧边栏中的“启动本地服务”按钮会调用 Native Host，并在后台启动：
 

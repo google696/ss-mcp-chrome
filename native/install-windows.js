@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,8 +11,9 @@ const nodePath = process.execPath;
 const hostScript = path.join(rootDir, "native", "host.js");
 const launcherPath = path.join(rootDir, "native", "ss-mcp-chrome-native-host.cmd");
 const manifestPath = path.join(rootDir, "native", "ss-mcp-chrome-native.json");
+const extensionManifestPath = path.join(rootDir, "extension", "manifest.json");
 const hostName = "com.google696.ss_mcp_chrome";
-const extensionId = readArg("--extension-id") || process.env.SS_MCP_CHROME_EXTENSION_ID;
+const extensionId = readArg("--extension-id") || process.env.SS_MCP_CHROME_EXTENSION_ID || readExtensionIdFromManifest();
 
 if (process.platform !== "win32") {
   throw new Error("当前安装脚本只支持 Windows。");
@@ -47,4 +49,13 @@ function readArg(name) {
   const prefix = `${name}=`;
   const item = process.argv.find((arg) => arg.startsWith(prefix));
   return item ? item.slice(prefix.length) : "";
+}
+
+function readExtensionIdFromManifest() {
+  if (!fs.existsSync(extensionManifestPath)) return "";
+  const manifest = JSON.parse(fs.readFileSync(extensionManifestPath, "utf8"));
+  if (!manifest.key) return "";
+  const der = Buffer.from(manifest.key, "base64");
+  const hex = createHash("sha256").update(der).digest("hex").slice(0, 32);
+  return hex.replace(/[0-9a-f]/g, (char) => String.fromCharCode(97 + Number.parseInt(char, 16)));
 }

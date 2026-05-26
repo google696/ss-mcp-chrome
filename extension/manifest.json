@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "SS MCP Chrome",
   "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtXjJwMuqFajsLHltVc6VHVffu/vcNJFolSAwPkSJ4fsCIJ5fVPNC86QqLGm6s9kTbvmnD8e1lmsg/plKjRxyiKc9tM1Ounf4bupF0b9P3/pmnKZFdQWWwhmelMv6m575nPaEWq2rdmZ+k0WVm8eVTBBGe4NTUUacT4KhG7fYU7BEJDwGqOXEKAuaEXT8zPf4RTf4rn7IZ5xReKU64Mo2N0ws0Yj1roClM/kF5vHMg874Ob/TgPjQygxgdqI0onFBBm/1j6gnm2hITyfCTeiVv14dntFs9fRJ84OhYTkc8QIHC8jGRBNIYd5BqinI29aKwIDAQAB",
   "minimum_chrome_version": "135",
   "description": "将 Chrome 连接到 ss-mcp-chrome 本地 MCP 桥接服务。",
   "icons": {
