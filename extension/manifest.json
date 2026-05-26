@@ -18,7 +18,8 @@
     "userScripts",
     "sidePanel",
     "downloads",
-    "nativeMessaging"
+    "nativeMessaging",
+    "clipboardWrite"
   ],
   "host_permissions": [
     "<all_urls>"

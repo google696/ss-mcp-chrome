@@ -108,6 +108,25 @@ Native Host 安装:
 npm run native:install -- --extension-id=${chrome.runtime.id}`;
 }
 
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {}
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.cssText = "position:fixed;left:-9999px;top:-9999px";
+  document.body.append(textarea);
+  textarea.select();
+  const ok = document.execCommand("copy");
+  textarea.remove();
+  return ok;
+}
+
 async function refreshStatus() {
   const response = await chrome.runtime.sendMessage({ type: "status" });
   renderStatus(response);
@@ -431,8 +450,12 @@ pickSelectorButton.addEventListener("click", async () => {
   toolMessageEl.textContent = "请在当前页面点击一个元素...";
   try {
     const result = await sendAction("page.pickSelector");
-    toolMessageEl.textContent = result.cancelled ? "已取消选择" : `选择器：${result.selector}`;
-    if (!result.cancelled) await navigator.clipboard?.writeText(result.selector).catch(() => {});
+    if (result.cancelled) {
+      toolMessageEl.textContent = "已取消选择";
+      return;
+    }
+    const copied = await copyText(result.selector);
+    toolMessageEl.textContent = copied ? `选择器已复制：${result.selector}` : `选择器：${result.selector}`;
   } catch (error) {
     toolMessageEl.textContent = error.message || String(error);
   }
@@ -447,7 +470,7 @@ saveSettingsButton.addEventListener("click", async () => {
 });
 
 copyConfigButton.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(buildClientConfig());
+  await copyText(buildClientConfig());
   toolMessageEl.textContent = "配置已复制";
 });
 

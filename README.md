@@ -18,7 +18,7 @@
 - 将当前标签页截图保存为本地 PNG 文件
 - 通过 CSS 选择器点击页面元素
 - 通过 CSS 选择器填写输入框、文本域、下拉框和可编辑元素
-- 在页面上点选元素并生成 CSS 选择器
+- 在页面上点选元素并生成 CSS 选择器，选择完成后自动复制
 - 在可信页面执行 JavaScript
 - 安装、编辑、启停、运行和删除用户脚本
 - 支持类似 ScriptCat/Tampermonkey 的 `==UserScript==` 元信息
@@ -352,7 +352,7 @@ Hermes 如果支持外部 MCP 服务，可按 stdio 方式接入：
 | `browser_click` | 通过 CSS 选择器点击元素 |
 | `browser_fill` | 通过 CSS 选择器填写表单 |
 | `browser_eval` | 在当前标签页执行 JavaScript |
-| `browser_pick_selector` | 在页面上点选元素并返回 CSS 选择器 |
+| `browser_pick_selector` | 在页面上点选元素并返回 CSS 选择器，可用于后续点击或填写 |
 | `script_list` | 列出扩展中保存的用户脚本 |
 | `script_install` | 安装一段 UserScript 源码 |
 | `script_remove` | 删除指定用户脚本 |
