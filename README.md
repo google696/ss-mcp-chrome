@@ -87,7 +87,7 @@ SS_MCP_CHROME_DEBUG_HTTP=0 npm start
 
 扩展支持通过 Native Messaging 启动本地桥接服务。首次使用前，客户电脑必须注册 Native Host。
 
-新版 manifest 已内置固定扩展 ID：`innecgngdpcbjngmbepnjfjcakephcdk`。客户加载新版扩展后，在项目目录执行：
+新版 manifest 已内置固定扩展 ID：`mkhfdlifenfjejohpfkhopnielkkligg`。客户加载新版扩展后，在项目目录执行：
 
 ```bash
 npm run native:install

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +56,7 @@ function readExtensionIdFromManifest() {
   const manifest = JSON.parse(fs.readFileSync(extensionManifestPath, "utf8"));
   if (!manifest.key) return "";
   const der = Buffer.from(manifest.key, "base64");
+  createPublicKey({ key: der, format: "der", type: "spki" });
   const hex = createHash("sha256").update(der).digest("hex").slice(0, 32);
   return hex.replace(/[0-9a-f]/g, (char) => String.fromCharCode(97 + Number.parseInt(char, 16)));
 }
