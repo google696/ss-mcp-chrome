@@ -15,12 +15,16 @@
 - 控制当前标签页跳转，或打开新标签页
 - 读取当前页面标题、网址、选中文本和可见正文
 - 截取当前标签页可见区域，返回 PNG data URL
+- 将当前标签页截图保存为本地 PNG 文件
 - 通过 CSS 选择器点击页面元素
 - 通过 CSS 选择器填写输入框、文本域、下拉框和可编辑元素
+- 在页面上点选元素并生成 CSS 选择器
 - 在可信页面执行 JavaScript
 - 安装、编辑、启停、运行和删除用户脚本
 - 支持类似 ScriptCat/Tampermonkey 的 `==UserScript==` 元信息
 - 支持扩展侧边栏脚本管理界面
+- 支持扩展设置页和连接诊断面板
+- 支持 Native Messaging 一键启动本地服务
 - 支持连接状态指示、手动连接、断开连接和自动重连
 - 同时提供 stdio MCP 和 Streamable HTTP MCP 接入方式
 - 提供 GitHub 仓库创建、About 更新、仓库删除等辅助自动化工具
@@ -79,6 +83,26 @@ SS_MCP_CHROME_DEBUG_HTTP=0 npm start
 
 通过 MCP 客户端使用 stdio 模式时，通常不需要长期手动运行 `npm start`。客户端会按照配置自动启动 `server/src/index.js`。如果手动进程占用了 `12307` 端口，客户端再次启动时可能出现端口冲突。
 
+## Native Messaging 一键启动
+
+扩展支持通过 Native Messaging 启动本地桥接服务。首次使用前需要注册 Native Host。
+
+1. 在 `chrome://extensions/` 打开 SS MCP Chrome 的详情页
+2. 复制扩展 ID
+3. 在项目目录执行：
+
+```bash
+npm run native:install -- --extension-id=你的扩展ID
+```
+
+安装完成后，扩展侧边栏中的“启动本地服务”按钮会调用 Native Host，并在后台启动：
+
+```bash
+node server/src/index.js --bridge-only
+```
+
+该模式只启动 WebSocket 桥接和调试 HTTP 服务，不占用 MCP stdio 通道，适合由 Chrome 扩展直接拉起本地服务。
+
 ## 加载 Chrome 扩展
 
 1. 打开 `chrome://extensions/`
@@ -90,6 +114,8 @@ SS_MCP_CHROME_DEBUG_HTTP=0 npm start
 7. 点击“连接”
 
 如果界面显示无法连接 `ws://127.0.0.1:12307`，说明本地服务未启动，或端口被其他进程占用。
+
+扩展详情页的“扩展选项”可打开设置页。设置页和侧边栏均支持修改 WebSocket 地址、调试 HTTP 地址、Native Host 名称，并可复制 Codex/OpenClaw/Hermes 接入配置。
 
 ## 调试接口
 
@@ -322,9 +348,11 @@ Hermes 如果支持外部 MCP 服务，可按 stdio 方式接入：
 | `browser_navigate` | 控制当前标签页或新标签页打开网址 |
 | `browser_read_page` | 读取当前页面文字和元信息 |
 | `browser_screenshot` | 截取当前标签页可见区域 |
+| `browser_screenshot_save` | 截取当前标签页可见区域并保存为本地 PNG 文件 |
 | `browser_click` | 通过 CSS 选择器点击元素 |
 | `browser_fill` | 通过 CSS 选择器填写表单 |
 | `browser_eval` | 在当前标签页执行 JavaScript |
+| `browser_pick_selector` | 在页面上点选元素并返回 CSS 选择器 |
 | `script_list` | 列出扩展中保存的用户脚本 |
 | `script_install` | 安装一段 UserScript 源码 |
 | `script_remove` | 删除指定用户脚本 |
@@ -352,12 +380,10 @@ Hermes 如果支持外部 MCP 服务，可按 stdio 方式接入：
 
 更完整的功能规划见 [docs/roadmap.md](docs/roadmap.md)。
 
-- Native Messaging 安装器
-- 扩展设置页
-- 页面元素选择器
 - 网络请求抓包
 - 流程录制和回放
-- 截图保存为本地文件
+- 用户脚本导入导出
+- 任务日志和危险操作确认
 - GitHub Actions 自动打包发布
 
 ## 许可证

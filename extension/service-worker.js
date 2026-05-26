@@ -1,6 +1,12 @@
-const DEFAULT_WS_URL = "ws://127.0.0.1:12307";
+const DEFAULT_SETTINGS = {
+  wsUrl: "ws://127.0.0.1:12307",
+  autoConnect: false,
+  debugHttpUrl: "http://127.0.0.1:12308",
+  nativeHostName: "com.google696.ss_mcp_chrome"
+};
 const AUTO_RECONNECT_DELAY_MS = 1200;
 const USER_SCRIPTS_KEY = "ssUserScripts";
+const SETTINGS_KEY = "ssMcpChromeSettings";
 
 let socket = null;
 let state = "disconnected";
@@ -14,6 +20,11 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.runtime.onStartup.addListener(() => {
   chrome.sidePanel?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});
+  getSettings()
+    .then((settings) => {
+      if (settings.autoConnect) connect().catch(() => {});
+    })
+    .catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -35,6 +46,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "settings.get") {
+    getSettings()
+      .then((settings) => sendResponse({ ok: true, settings }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
+  if (message.type === "settings.save") {
+    saveSettings(message.settings || {})
+      .then((settings) => sendResponse({ ok: true, settings }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
+  if (message.type === "diagnostics") {
+    runDiagnostics()
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
+  if (message.type === "native.start") {
+    startNativeHost()
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) => sendResponse({ ok: false, error: error.message || String(error) }));
+    return true;
+  }
+
   if (message.type === "action") {
     dispatchAction(message.action, message.payload || {})
       .then((result) => sendResponse({ ok: true, result }))
@@ -50,21 +89,22 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   injectMatchingUserScripts(tabId, tab.url).catch(() => {});
 });
 
-function connect() {
+async function connect() {
+  const settings = await getSettings();
   shouldReconnect = true;
   if (socket && socket.readyState === WebSocket.OPEN) {
     state = "connected";
     lastError = "";
-    return Promise.resolve();
+    return;
   }
 
   if (socket && socket.readyState === WebSocket.CONNECTING) {
-    return waitForOpen(socket);
+    return await waitForOpen(socket);
   }
 
   state = "connecting";
   lastError = "";
-  socket = new WebSocket(DEFAULT_WS_URL);
+  socket = new WebSocket(settings.wsUrl);
 
   socket.addEventListener("open", () => {
     state = "connected";
@@ -86,7 +126,7 @@ function connect() {
     await handleBridgeMessage(event.data);
   });
 
-  return waitForOpen(socket);
+  return await waitForOpen(socket);
 }
 
 function disconnect() {
@@ -133,7 +173,7 @@ function getStatus(error = "") {
       connected: true,
       state: "connected",
       label: "已连接",
-      detail: DEFAULT_WS_URL
+      detail: socket.url
     };
   }
 
@@ -152,6 +192,105 @@ function scheduleReconnect() {
     reconnectTimer = null;
     connect().catch(() => {});
   }, AUTO_RECONNECT_DELAY_MS);
+}
+
+async function getSettings() {
+  const data = await chrome.storage.local.get(SETTINGS_KEY);
+  return { ...DEFAULT_SETTINGS, ...(data[SETTINGS_KEY] || {}) };
+}
+
+async function saveSettings(nextSettings) {
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...(nextSettings || {})
+  };
+  settings.wsUrl = normalizeWsUrl(settings.wsUrl);
+  settings.debugHttpUrl = String(settings.debugHttpUrl || DEFAULT_SETTINGS.debugHttpUrl).trim();
+  settings.nativeHostName = String(settings.nativeHostName || DEFAULT_SETTINGS.nativeHostName).trim();
+  settings.autoConnect = Boolean(settings.autoConnect);
+  await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+  return settings;
+}
+
+function normalizeWsUrl(value) {
+  const url = String(value || DEFAULT_SETTINGS.wsUrl).trim();
+  if (!/^wss?:\/\/.+/i.test(url)) throw new Error("WebSocket 地址必须以 ws:// 或 wss:// 开头");
+  return url;
+}
+
+async function runDiagnostics() {
+  const settings = await getSettings();
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const scripts = await getStoredScripts();
+  const permissions = await chrome.permissions.getAll();
+  return {
+    extensionId: chrome.runtime.id,
+    version: chrome.runtime.getManifest().version,
+    connection: getStatus(),
+    settings,
+    activeTab: tab ? {
+      id: tab.id,
+      title: tab.title,
+      url: tab.url,
+      injectable: Boolean(tab.url && isInjectableUrl(tab.url))
+    } : null,
+    permissions: permissions.permissions || [],
+    userScriptsApi: Boolean(chrome.userScripts?.execute),
+    scripts: {
+      count: scripts.length,
+      enabled: scripts.filter((script) => script.enabled).length
+    },
+    checks: [
+      checkItem("WebSocket 地址", /^wss?:\/\/.+/i.test(settings.wsUrl), settings.wsUrl),
+      checkItem("扩展连接", getStatus().connected, getStatus().label),
+      checkItem("当前页面可注入", Boolean(tab?.url && isInjectableUrl(tab.url)), tab?.url || "没有活动标签页"),
+      checkItem("用户脚本 API", Boolean(chrome.userScripts?.execute), chrome.userScripts?.execute ? "可用" : "不可用"),
+      checkItem("Native Host 名称", Boolean(settings.nativeHostName), settings.nativeHostName)
+    ]
+  };
+}
+
+function checkItem(name, ok, detail) {
+  return { name, ok: Boolean(ok), detail };
+}
+
+async function startNativeHost() {
+  const settings = await getSettings();
+  if (!chrome.runtime.connectNative) {
+    throw new Error("当前 Chrome 不支持 Native Messaging，或扩展缺少 nativeMessaging 权限。");
+  }
+
+  return await new Promise((resolve, reject) => {
+    let settled = false;
+    const port = chrome.runtime.connectNative(settings.nativeHostName);
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      try { port.disconnect(); } catch {}
+      reject(new Error("Native Host 没有响应。请先运行 npm run native:install 注册主机。"));
+    }, 5000);
+
+    port.onMessage.addListener((message) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(message);
+      try { port.disconnect(); } catch {}
+    });
+
+    port.onDisconnect.addListener(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(chrome.runtime.lastError?.message || "Native Host 已断开。"));
+    });
+
+    port.postMessage({
+      type: "start",
+      wsUrl: settings.wsUrl,
+      debugHttpUrl: settings.debugHttpUrl
+    });
+  });
 }
 
 async function handleBridgeMessage(raw) {
@@ -189,12 +328,16 @@ async function dispatchAction(action, payload) {
       return await runInActiveTab(readPage);
     case "page.screenshot":
       return await screenshot();
+    case "page.screenshot.save":
+      return await saveScreenshot(payload);
     case "page.click":
       return await runInActiveTab(clickElement, [payload.selector]);
     case "page.fill":
       return await runInActiveTab(fillElement, [payload.selector, payload.value]);
     case "page.eval":
       return await runInActiveTab(evalCode, [payload.code]);
+    case "page.pickSelector":
+      return await runInActiveTab(pickElementSelector);
     case "scripts.list":
       return await listUserScripts();
     case "scripts.install":
@@ -260,6 +403,24 @@ async function screenshot() {
   const tab = await getActiveTab();
   const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
   return { tabId: tab.id, dataUrl };
+}
+
+async function saveScreenshot({ filename = "" } = {}) {
+  const tab = await getActiveTab();
+  const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+  const safeTitle = (tab.title || "screenshot")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || "screenshot";
+  const targetName = filename || `SS-MCP-Chrome/${new Date().toISOString().replace(/[:.]/g, "-")}-${safeTitle}.png`;
+  const downloadId = await chrome.downloads.download({
+    url: dataUrl,
+    filename: targetName,
+    saveAs: false,
+    conflictAction: "uniquify"
+  });
+  return { tabId: tab.id, downloadId, filename: targetName };
 }
 
 async function runInActiveTab(func, args = []) {
@@ -338,6 +499,116 @@ function evalCode(code) {
   } catch {
     return Function(`"use strict"; ${code}`)();
   }
+}
+
+function pickElementSelector() {
+  return new Promise((resolve) => {
+    const previousCursor = document.documentElement.style.cursor;
+    const overlay = document.createElement("div");
+    overlay.style.cssText = [
+      "position:fixed",
+      "z-index:2147483647",
+      "pointer-events:none",
+      "border:2px solid #0f766e",
+      "background:rgba(15,118,110,.12)",
+      "box-shadow:0 0 0 99999px rgba(0,0,0,.08)",
+      "display:none"
+    ].join(";");
+
+    const tip = document.createElement("div");
+    tip.textContent = "点击页面元素生成 CSS 选择器，按 Esc 取消";
+    tip.style.cssText = [
+      "position:fixed",
+      "left:12px",
+      "bottom:12px",
+      "z-index:2147483647",
+      "padding:8px 10px",
+      "border-radius:6px",
+      "background:#172026",
+      "color:#fff",
+      "font:12px/1.4 system-ui,sans-serif",
+      "pointer-events:none"
+    ].join(";");
+
+    document.documentElement.append(overlay, tip);
+    document.documentElement.style.cursor = "crosshair";
+
+    const cleanup = () => {
+      document.removeEventListener("mousemove", onMove, true);
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("keydown", onKeydown, true);
+      overlay.remove();
+      tip.remove();
+      document.documentElement.style.cursor = previousCursor;
+    };
+
+    const onMove = (event) => {
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      if (!element || element === overlay || element === tip) return;
+      const rect = element.getBoundingClientRect();
+      overlay.style.display = "block";
+      overlay.style.left = `${Math.max(0, rect.left)}px`;
+      overlay.style.top = `${Math.max(0, rect.top)}px`;
+      overlay.style.width = `${rect.width}px`;
+      overlay.style.height = `${rect.height}px`;
+    };
+
+    const onClick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      cleanup();
+      if (!element || element === overlay || element === tip) {
+        resolve({ cancelled: true });
+        return;
+      }
+      resolve({
+        selector: buildCssSelector(element),
+        tag: element.tagName.toLowerCase(),
+        text: (element.innerText || element.value || element.getAttribute("aria-label") || "").trim().slice(0, 160),
+        url: location.href
+      });
+    };
+
+    const onKeydown = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      cleanup();
+      resolve({ cancelled: true });
+    };
+
+    document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("keydown", onKeydown, true);
+  });
+}
+
+function buildCssSelector(element) {
+  if (element.id) return `#${CSS.escape(element.id)}`;
+
+  const parts = [];
+  let current = element;
+  while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.documentElement) {
+    let part = current.tagName.toLowerCase();
+    const testId = current.getAttribute("data-testid") || current.getAttribute("data-test");
+    const name = current.getAttribute("name");
+    const aria = current.getAttribute("aria-label");
+    if (testId) part += `[data-testid="${cssAttr(testId)}"]`;
+    else if (name) part += `[name="${cssAttr(name)}"]`;
+    else if (aria) part += `[aria-label="${cssAttr(aria)}"]`;
+    else {
+      const sameTagSiblings = [...current.parentElement?.children || []].filter((item) => item.tagName === current.tagName);
+      if (sameTagSiblings.length > 1) part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;
+    }
+    parts.unshift(part);
+    if (document.querySelectorAll(parts.join(" > ")).length === 1) break;
+    current = current.parentElement;
+  }
+  return parts.join(" > ");
+}
+
+function cssAttr(value) {
+  return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 async function getStoredScripts() {

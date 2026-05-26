@@ -19,6 +19,11 @@ if (process.env.SS_MCP_CHROME_DEBUG_HTTP !== "0") {
   new DebugHttpServer({ bridge, port: debugHttpPort, createMcpServer }).start();
 }
 
+if (process.argv.includes("--bridge-only")) {
+  console.error(`ss-mcp-chrome bridge listening on ws://127.0.0.1:${port}`);
+  await new Promise(() => {});
+}
+
 const server = createMcpServer(bridge);
 const transport = new StdioServerTransport();
 await server.connect(transport);

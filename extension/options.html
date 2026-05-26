@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SS MCP Chrome 设置</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body class="options-page">
+    <main>
+      <header class="app-header">
+        <img src="icons/icon-48.png" alt="">
+        <div>
+          <h1>SS MCP Chrome 设置</h1>
+          <p id="detail">配置本地桥接地址、Native Host 和 MCP 客户端接入信息。</p>
+        </div>
+      </header>
+
+      <section class="settings-panel">
+        <label>
+          WebSocket 地址
+          <input id="wsUrl" type="text" autocomplete="off">
+        </label>
+        <label>
+          调试 HTTP 地址
+          <input id="debugHttpUrl" type="text" autocomplete="off">
+        </label>
+        <label>
+          Native Host 名称
+          <input id="nativeHostName" type="text" autocomplete="off">
+        </label>
+        <label class="checkline">
+          <input id="autoConnect" type="checkbox">
+          自动重连
+        </label>
+        <div class="editor-actions">
+          <button id="saveSettings" type="button">保存设置</button>
+          <button id="copyConfig" type="button">复制接入配置</button>
+        </div>
+        <p id="toolMessage" class="tool-message"></p>
+      </section>
+    </main>
+    <script src="options.js" type="module"></script>
+  </body>
+</html>

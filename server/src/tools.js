@@ -52,6 +52,15 @@ export function registerTools(server, bridge) {
   );
 
   server.tool(
+    "browser_screenshot_save",
+    "截取当前 Chrome 标签页可见区域，并通过 Chrome 下载管理器保存为 PNG 文件。",
+    {
+      filename: z.string().default("")
+    },
+    async ({ filename }) => textResult(await bridge.send("page.screenshot.save", { filename }))
+  );
+
+  server.tool(
     "browser_click",
     "通过 CSS 选择器点击当前标签页中的元素。",
     {
@@ -77,6 +86,13 @@ export function registerTools(server, bridge) {
       code: z.string().min(1)
     },
     async ({ code }) => textResult(await bridge.send("page.eval", { code }))
+  );
+
+  server.tool(
+    "browser_pick_selector",
+    "在当前页面启动元素选择器，点击页面元素后返回可用于 browser_click/browser_fill 的 CSS 选择器。",
+    {},
+    async () => textResult(await bridge.send("page.pickSelector", {}, 120000))
   );
 
   server.tool(

@@ -2,6 +2,18 @@ const statusEl = document.querySelector("#status");
 const statusLightEl = document.querySelector("#statusLight");
 const detailEl = document.querySelector("#detail");
 const connectionButton = document.querySelector("#connectionButton");
+const nativeStartButton = document.querySelector("#nativeStart");
+const saveScreenshotButton = document.querySelector("#saveScreenshot");
+const pickSelectorButton = document.querySelector("#pickSelector");
+const toolMessageEl = document.querySelector("#toolMessage");
+const wsUrlEl = document.querySelector("#wsUrl");
+const debugHttpUrlEl = document.querySelector("#debugHttpUrl");
+const nativeHostNameEl = document.querySelector("#nativeHostName");
+const autoConnectEl = document.querySelector("#autoConnect");
+const saveSettingsButton = document.querySelector("#saveSettings");
+const copyConfigButton = document.querySelector("#copyConfig");
+const runDiagnosticsButton = document.querySelector("#runDiagnostics");
+const diagnosticsListEl = document.querySelector("#diagnosticsList");
 const newScriptButton = document.querySelector("#newScript");
 const scriptListEl = document.querySelector("#scriptList");
 const editorEl = document.querySelector("#editor");
@@ -32,6 +44,68 @@ async function sendAction(action, payload = {}) {
   const response = await chrome.runtime.sendMessage({ type: "action", action, payload });
   if (!response?.ok) throw new Error(response?.error || "操作失败");
   return response.result;
+}
+
+async function sendRuntimeMessage(message) {
+  const response = await chrome.runtime.sendMessage(message);
+  if (response?.ok === false) throw new Error(response.error || "操作失败");
+  return response;
+}
+
+async function loadSettings() {
+  const response = await sendRuntimeMessage({ type: "settings.get" });
+  const settings = response.settings;
+  wsUrlEl.value = settings.wsUrl;
+  debugHttpUrlEl.value = settings.debugHttpUrl;
+  nativeHostNameEl.value = settings.nativeHostName;
+  autoConnectEl.checked = Boolean(settings.autoConnect);
+}
+
+async function saveSettings() {
+  const response = await sendRuntimeMessage({
+    type: "settings.save",
+    settings: {
+      wsUrl: wsUrlEl.value.trim(),
+      debugHttpUrl: debugHttpUrlEl.value.trim(),
+      nativeHostName: nativeHostNameEl.value.trim(),
+      autoConnect: autoConnectEl.checked
+    }
+  });
+  toolMessageEl.textContent = "设置已保存";
+  return response.settings;
+}
+
+async function runDiagnostics() {
+  diagnosticsListEl.textContent = "正在检查...";
+  const response = await sendRuntimeMessage({ type: "diagnostics" });
+  renderDiagnostics(response.result);
+}
+
+function renderDiagnostics(result) {
+  diagnosticsListEl.textContent = "";
+  for (const item of result.checks || []) {
+    const row = document.createElement("div");
+    row.className = item.ok ? "diagnostic-row ok" : "diagnostic-row bad";
+    const light = document.createElement("span");
+    const name = document.createElement("strong");
+    const detail = document.createElement("small");
+    name.textContent = item.name;
+    detail.textContent = item.detail || "";
+    row.append(light, name, detail);
+    diagnosticsListEl.append(row);
+  }
+}
+
+function buildClientConfig() {
+  return `[mcp_servers.ss-mcp-chrome]
+command = "node"
+args = ["D:\\\\mcp\\\\ss-mcp-chrome\\\\server\\\\src\\\\index.js"]
+
+OpenClaw Streamable HTTP:
+http://127.0.0.1:12308/mcp
+
+Native Host 安装:
+npm run native:install -- --extension-id=${chrome.runtime.id}`;
 }
 
 async function refreshStatus() {
@@ -332,6 +406,59 @@ connectionButton.addEventListener("click", async () => {
   renderStatus(response);
 });
 
+nativeStartButton.addEventListener("click", async () => {
+  toolMessageEl.textContent = "正在启动本地服务...";
+  try {
+    const response = await sendRuntimeMessage({ type: "native.start" });
+    toolMessageEl.textContent = response.result?.message || "本地服务启动请求已发送";
+    await refreshStatus();
+  } catch (error) {
+    toolMessageEl.textContent = error.message || String(error);
+  }
+});
+
+saveScreenshotButton.addEventListener("click", async () => {
+  toolMessageEl.textContent = "正在保存截图...";
+  try {
+    const result = await sendAction("page.screenshot.save");
+    toolMessageEl.textContent = `截图已保存：${result.filename}`;
+  } catch (error) {
+    toolMessageEl.textContent = error.message || String(error);
+  }
+});
+
+pickSelectorButton.addEventListener("click", async () => {
+  toolMessageEl.textContent = "请在当前页面点击一个元素...";
+  try {
+    const result = await sendAction("page.pickSelector");
+    toolMessageEl.textContent = result.cancelled ? "已取消选择" : `选择器：${result.selector}`;
+    if (!result.cancelled) await navigator.clipboard?.writeText(result.selector).catch(() => {});
+  } catch (error) {
+    toolMessageEl.textContent = error.message || String(error);
+  }
+});
+
+saveSettingsButton.addEventListener("click", async () => {
+  try {
+    await saveSettings();
+  } catch (error) {
+    toolMessageEl.textContent = error.message || String(error);
+  }
+});
+
+copyConfigButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(buildClientConfig());
+  toolMessageEl.textContent = "配置已复制";
+});
+
+runDiagnosticsButton.addEventListener("click", async () => {
+  try {
+    await runDiagnostics();
+  } catch (error) {
+    diagnosticsListEl.textContent = error.message || String(error);
+  }
+});
+
 newScriptButton.addEventListener("click", openNewEditor);
 closeEditorButton.addEventListener("click", closeNewEditor);
 
@@ -362,5 +489,7 @@ deleteScriptButton.addEventListener("click", async () => {
   closeNewEditor();
 });
 
+await loadSettings();
 await refreshStatus();
+await runDiagnostics();
 await refreshScripts();

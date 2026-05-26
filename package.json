@@ -10,8 +10,10 @@
   "scripts": {
     "start": "node ./server/src/index.js",
     "bridge": "node ./server/src/index.js",
+    "bridge-only": "node ./server/src/index.js --bridge-only",
     "dev": "node --watch ./server/src/index.js",
-    "check": "node ./server/src/index.js --check"
+    "check": "node ./server/src/index.js --check",
+    "native:install": "node ./native/install-windows.js"
   },
   "keywords": [
     "mcp",

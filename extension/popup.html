@@ -26,6 +26,45 @@
         <a href="https://github.com/google696/ss-mcp-chrome" target="_blank" rel="noreferrer">github.com/google696/ss-mcp-chrome</a>
       </section>
 
+      <section class="quick-actions">
+        <button id="nativeStart" type="button">启动本地服务</button>
+        <button id="saveScreenshot" type="button">保存截图</button>
+        <button id="pickSelector" type="button">选择元素</button>
+      </section>
+      <p id="toolMessage" class="tool-message"></p>
+
+      <section class="settings-panel">
+        <div class="section-title">
+          <h2>设置</h2>
+          <button id="copyConfig" type="button">复制配置</button>
+        </div>
+        <label>
+          WebSocket 地址
+          <input id="wsUrl" type="text" autocomplete="off">
+        </label>
+        <label>
+          调试 HTTP 地址
+          <input id="debugHttpUrl" type="text" autocomplete="off">
+        </label>
+        <label>
+          Native Host 名称
+          <input id="nativeHostName" type="text" autocomplete="off">
+        </label>
+        <label class="checkline">
+          <input id="autoConnect" type="checkbox">
+          自动重连
+        </label>
+        <button id="saveSettings" type="button">保存设置</button>
+      </section>
+
+      <section class="diagnostics-panel">
+        <div class="section-title">
+          <h2>连接诊断</h2>
+          <button id="runDiagnostics" type="button">检查</button>
+        </div>
+        <div id="diagnosticsList" class="diagnostics-list"></div>
+      </section>
+
       <section class="scripts-header">
         <h2>脚本</h2>
         <button id="newScript" type="button">新建</button>
