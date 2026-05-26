@@ -109,9 +109,7 @@ function renderScripts() {
     if (expanded) {
       main.append(createPatternDetails(script));
     }
-    if (isEditing) {
-      main.append(createInlineEditor(script));
-    }
+    const inlineEditor = isEditing ? createInlineEditor(script) : null;
 
     const expandButton = document.createElement("button");
     expandButton.className = "expand-button";
@@ -149,6 +147,9 @@ function renderScripts() {
     });
 
     row.append(checkbox, main, expandButton, editButton, runButton);
+    if (inlineEditor) {
+      row.append(inlineEditor);
+    }
     scriptListEl.append(row);
   }
 }
