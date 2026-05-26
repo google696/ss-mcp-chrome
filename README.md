@@ -105,10 +105,30 @@ node server/src/index.js --bridge-only
 
 ## 加载 Chrome 扩展
 
+Chrome 必须加载包含 `manifest.json` 的扩展目录。直接选择项目根目录会出现“清单文件缺失或不可读取”。
+
+推荐先生成干净的扩展目录：
+
+```bash
+npm run extension:prepare
+```
+
+然后在 Chrome 中选择：
+
+```text
+dist/ss-mcp-chrome-extension
+```
+
+开发调试时也可以直接选择：
+
+```text
+extension
+```
+
 1. 打开 `chrome://extensions/`
 2. 开启“开发者模式”
 3. 点击“加载已解压的扩展程序”
-4. 选择本项目的 `extension` 目录
+4. 选择 `dist/ss-mcp-chrome-extension` 或本项目的 `extension` 目录
 5. 确认本地 MCP 服务已经启动
 6. 点击扩展图标打开右侧 Side Panel
 7. 点击“连接”
