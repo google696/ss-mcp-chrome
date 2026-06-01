@@ -4,3 +4,5 @@ node_modules/
 *.log
 dist/
 coverage/
+native/ss-mcp-chrome-native-host.cmd
+native/ss-mcp-chrome-native.json

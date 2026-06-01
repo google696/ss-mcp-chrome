@@ -503,6 +503,8 @@ function evalCode(code) {
 
 function pickElementSelector() {
   return new Promise((resolve) => {
+    let done = false;
+    let blockNextClick = false;
     const previousCursor = document.documentElement.style.cursor;
     const overlay = document.createElement("div");
     overlay.style.cssText = [
@@ -535,7 +537,8 @@ function pickElementSelector() {
 
     const cleanup = () => {
       document.removeEventListener("mousemove", onMove, true);
-      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("pointerdown", onPick, true);
+      if (!blockNextClick) document.removeEventListener("click", onClick, true);
       document.removeEventListener("keydown", onKeydown, true);
       overlay.remove();
       tip.remove();
@@ -553,16 +556,28 @@ function pickElementSelector() {
       overlay.style.height = `${rect.height}px`;
     };
 
-    const onClick = (event) => {
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve(value);
+    };
+
+    const onPick = (event) => {
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
+      blockNextClick = true;
+      setTimeout(() => {
+        blockNextClick = false;
+        document.removeEventListener("click", onClick, true);
+      }, 600);
       const element = document.elementFromPoint(event.clientX, event.clientY);
-      cleanup();
       if (!element || element === overlay || element === tip) {
-        resolve({ cancelled: true });
+        finish({ cancelled: true });
         return;
       }
-      resolve({
+      finish({
         selector: buildCssSelector(element),
         tag: element.tagName.toLowerCase(),
         text: (element.innerText || element.value || element.getAttribute("aria-label") || "").trim().slice(0, 160),
@@ -570,14 +585,22 @@ function pickElementSelector() {
       });
     };
 
+    const onClick = (event) => {
+      if (!done && !blockNextClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+
     const onKeydown = (event) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      cleanup();
-      resolve({ cancelled: true });
+      event.stopPropagation();
+      finish({ cancelled: true });
     };
 
     document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("pointerdown", onPick, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKeydown, true);
   });
@@ -593,9 +616,11 @@ function buildCssSelector(element) {
     const testId = current.getAttribute("data-testid") || current.getAttribute("data-test");
     const name = current.getAttribute("name");
     const aria = current.getAttribute("aria-label");
+    const stableClass = [...current.classList || []].find((item) => /^[A-Za-z_-][\w-]{1,40}$/.test(item) && !/^(active|selected|focus|hover|open|show|hide|disabled)$/i.test(item));
     if (testId) part += `[data-testid="${cssAttr(testId)}"]`;
     else if (name) part += `[name="${cssAttr(name)}"]`;
     else if (aria) part += `[aria-label="${cssAttr(aria)}"]`;
+    else if (stableClass) part += `.${CSS.escape(stableClass)}`;
     else {
       const sameTagSiblings = [...current.parentElement?.children || []].filter((item) => item.tagName === current.tagName);
       if (sameTagSiblings.length > 1) part += `:nth-of-type(${sameTagSiblings.indexOf(current) + 1})`;

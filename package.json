@@ -13,7 +13,9 @@
     "bridge-only": "node ./server/src/index.js --bridge-only",
     "dev": "node --watch ./server/src/index.js",
     "check": "node ./server/src/index.js --check",
+    "doctor": "node ./scripts/doctor.js",
     "extension:prepare": "node ./scripts/prepare-extension.js",
+    "release:pack": "node ./scripts/package-release.js",
     "native:install": "node ./native/install-windows.js"
   },
   "keywords": [

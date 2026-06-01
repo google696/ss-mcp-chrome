@@ -51,6 +51,36 @@ ss-mcp-chrome/
 npm install
 ```
 
+## Windows 一键安装
+
+客户电脑推荐直接运行：
+
+```bat
+install-windows.bat
+```
+
+或在 PowerShell 中运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+安装器会自动检查 Node.js、安装依赖、生成扩展目录，并注册 Native Messaging Host。完成后在 Chrome 里加载：
+
+```text
+dist\ss-mcp-chrome-extension
+```
+
+## 安装诊断
+
+如果扩展无法加载、Native Host 找不到、本地服务连不上，先运行：
+
+```bash
+npm run doctor
+```
+
+诊断会检查 Node.js 版本、依赖、manifest key、Native Host 注册、扩展 ID、常用端口和调试 HTTP 状态。
+
 ## 启动服务
 
 ```bash
@@ -110,6 +140,27 @@ node server/src/index.js --bridge-only
 ```
 
 该模式只启动 WebSocket 桥接和调试 HTTP 服务，不占用 MCP stdio 通道，适合由 Chrome 扩展直接拉起本地服务。
+
+## Release 打包
+
+本地生成发布包：
+
+```bash
+npm run release:pack
+```
+
+输出目录：
+
+```text
+dist/release
+```
+
+包含两个 zip：
+
+- `ss-mcp-chrome-extension.zip`：只包含 Chrome 扩展，适合手动加载或分发。
+- `ss-mcp-chrome-windows.zip`：包含服务端、扩展、安装脚本和文档，适合 Windows 客户电脑安装。
+
+GitHub Actions 已配置 Release 工作流。推送 `v*` 标签时会自动运行检查、打包并上传 zip 到 GitHub Release。
 
 ## 加载 Chrome 扩展
 
@@ -380,7 +431,7 @@ Hermes 如果支持外部 MCP 服务，可按 stdio 方式接入：
 | `browser_click` | 通过 CSS 选择器点击元素 |
 | `browser_fill` | 通过 CSS 选择器填写表单 |
 | `browser_eval` | 在当前标签页执行 JavaScript |
-| `browser_pick_selector` | 在页面上点选元素并返回 CSS 选择器，可用于后续点击或填写 |
+| `browser_pick_selector` | 在页面上点选元素并返回 CSS 选择器，可用于后续点击或填写；选择时会阻止目标链接/按钮立即触发 |
 | `script_list` | 列出扩展中保存的用户脚本 |
 | `script_install` | 安装一段 UserScript 源码 |
 | `script_remove` | 删除指定用户脚本 |
